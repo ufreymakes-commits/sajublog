@@ -1,0 +1,3418 @@
+// ========================================
+// [공통 헬퍼 함수] 템플릿 변수 치환
+// ========================================
+function fillPlaceholders(text, data) {
+  if (!text) return "";
+  return text.replace(/{(\w+)}/g, (match, key) => data[key] || match);
+}
+
+// [공통 헬퍼 함수] 천간/지지를 오행 문자로 변환
+function getElementType(hanja) {
+  const map = {
+    "갑": "목", "을": "목", "병": "화", "정": "화", "무": "토", "기": "토", "경": "금", "신": "금", "임": "수", "계": "수",
+    "인": "목", "묘": "목", "사": "화", "오": "화", "진": "토", "술": "토", "축": "토", "미": "토", "신": "금", "유": "금", "해": "수", "자": "수"
+  };
+  return map[hanja] || "";
+}
+
+// ========================================
+// 섹션 1 생성 메인 함수
+// ========================================
+function generateSection1(sajuData) {
+  const {
+    userName,
+    dayPillar,
+    fiveElements,
+    pillars,
+    sinsal
+  } = sajuData;
+
+  // 1단계: 첫 문장 생성 (비유)
+  const opening = generateOpeningSentence(userName, dayPillar, fiveElements, sinsal);
+  
+  // 2단계: 이중성 설명
+  const duality = generateDualityDescription(dayPillar);
+  
+  // 3단계: 일주 환경 설명 (개선됨)
+  const environment = generateEnvironmentDescription(dayPillar, pillars, fiveElements);
+  
+  // 4단계: 명리학 해석
+  const myeongri = generateMyeongriInterpretation(sajuData);
+  
+  // 5단계: 현실 조언 (개선됨)
+  const advice = generatePracticalAdvice(sajuData);
+  
+  // 최종 결과 조합 (문장 간 간격 조정)
+  return `${opening}\n\n${duality}\n\n${environment}\n\n${myeongri}\n\n${advice}`;
+}
+
+// ========================================
+// 1단계: 첫 문장 (비유)
+// ========================================
+function generateOpeningSentence(userName, dayPillar, fiveElements, sinsal) {
+  const metaphor = DAY_PILLAR_METAPHOR[dayPillar];
+  const elementEnv = selectElementEnvironment(fiveElements);
+  const tension = selectSinsalTension(sinsal);
+  
+  return `${userName}님을 한마디로 정의하자면 ${elementEnv} ${tension} ${metaphor.image}와도 같습니다.`;
+}
+
+function selectElementEnvironment(fiveElements) {
+  const maxElement = Object.keys(fiveElements).reduce((a, b) => 
+    fiveElements[a] > fiveElements[b] ? a : b
+  );
+  const maxCount = fiveElements[maxElement];
+  
+  let level = maxCount >= 4 ? "과다" : (maxCount >= 2 ? "적당" : "부족");
+  const options = FIVE_ELEMENTS_ENVIRONMENT[`${maxElement}${level}`] || ["묘한 기운이 감도는"];
+  
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function selectSinsalTension(sinsal) {
+  const priority = ["원진살", "귀문관살", "충", "형", "도화살"];
+  for (const s of priority) {
+    if (sinsal.includes(s)) return SINSAL_TENSION[s];
+  }
+  return ""; 
+}
+
+// ========================================
+// 2단계: 이중성 설명
+// ========================================
+function generateDualityDescription(dayPillar) {
+  const duality = DAY_PILLAR_DUALITY[dayPillar];
+  return `겉으로는 ${duality.outside}, 내면에는 ${duality.inside} 반전 매력의 소유자시네요. 남들이 볼 때는 여리여리해 보여도, ${duality.strength} 하나는 타의 추종을 불허하는 '${duality.keyword}'의 끝판왕입니다.`;
+}
+
+// ========================================
+// 3단계: 일주 환경 설명 (모든 오행 대응형 수정)
+// ========================================
+function generateEnvironmentDescription(dayPillar, pillars, fiveElements) {
+  const env = DAY_PILLAR_ENVIRONMENT[dayPillar];
+  
+  // 가장 강한 오행 찾기
+  const maxElement = Object.keys(fiveElements).reduce((a, b) => 
+    fiveElements[a] > fiveElements[b] ? a : b
+  );
+  
+  const elementMap = { "목": "나무줄기", "화": "불길", "토": "흙먼지", "금": "바위와 칼날", "수": "물바다" };
+  
+  // 주변 기운 텍스트 생성
+  let envText = "";
+  if (fiveElements[maxElement] >= 4) {
+    envText = `주변에 '${maxElement}'의 기운이 매우 강해 거대한 ${elementMap[maxElement]}가 펼쳐져 있는 형국입니다`;
+  } else {
+    envText = `오행의 기운이 어느 한쪽으로 치우치지 않고 비교적 고르게 분포되어 조화를 이루고 있습니다`;
+  }
+
+  return `이런 해석이 나온 이유는 본인을 상징하는 일주가 '${dayPillar}'이기 때문입니다. ${env.climate} ${env.detail}인데, 사주 주변에는 ${envText}. ${env.characteristic}.`;
+}
+
+// ========================================
+// 4단계: 명리학 해석
+// ========================================
+function generateMyeongriInterpretation(sajuData) {
+  const { dayMaster, dayBranch, fiveElements, tonggeun, sinsal, missingSipsung } = sajuData;
+  let result = "명리학적으로 보면 ";
+
+  // 통근 해석
+  if (tonggeun) {
+    const key = `${getElementType(dayMaster)}_${getElementType(dayBranch)}`;
+    const tonggeunDesc = ILGAN_TONGGEUN[key];
+    if (tonggeunDesc) {
+      result += fillPlaceholders(tonggeunDesc.description + ` ${tonggeunDesc.strength}, `, { 일간: dayMaster, 일지: dayBranch });
+    }
+  }
+
+  // 오행 패턴 해석
+  const elementPattern = detectElementPattern(fiveElements, missingSipsung);
+  if (elementPattern) {
+    const patternDesc = ELEMENT_PATTERN_SENTENCES[elementPattern];
+    result += fillPlaceholders(`${patternDesc.description} ${patternDesc.challenge}, ${patternDesc.reward || patternDesc.strength} `, 
+      { 일간: dayMaster, 일지: dayBranch, 개수: fiveElements[getElementType(dayMaster)] });
+  }
+
+  // 신살 해석
+  for (const s of sinsal) {
+    const sinsalDesc = SINSAL_MYEONGRI_INTERPRETATION[s];
+    if (sinsalDesc) {
+      result += fillPlaceholders(`${sinsalDesc.cause} ${sinsalDesc.effect}. ${sinsalDesc.detail} `, { 위치: "사주 전체", 원진명: s });
+      break; 
+    }
+  }
+
+  return result;
+}
+
+function detectElementPattern(fiveElements, missingSipsung) {
+  if (fiveElements["수"] >= 4) return "수과다_2";
+  if (fiveElements["목"] === 0) return "목부족_무관_1";
+  if (fiveElements["토"] >= 3) return "토과다_1";
+  if (fiveElements["화"] >= 3) return "화과다_1";
+  if (fiveElements["금"] >= 3) return "금과다_1";
+  return null;
+}
+
+// ========================================
+// 5단계: 현실 조언 (데이터 키 매핑 최적화 수정)
+// ========================================
+function generatePracticalAdvice(sajuData) {
+  const { fiveElements, dayMaster, sinsal, missingSipsung } = sajuData;
+  
+  // 가장 많은 오행 찾기
+  const maxElement = Object.keys(fiveElements).reduce((a, b) => 
+    fiveElements[a] > fiveElements[b] ? a : b
+  );
+  
+  let adviceKey = null;
+
+  // 1순위: 오행과다 + 일간 조합 (예: "수과다_기토")
+  if (fiveElements[maxElement] >= 4) {
+    adviceKey = `${maxElement}과다_${dayMaster}`;
+  }
+  
+  // 2순위: 신살 기반 (키가 없을 경우)
+  if (!PRACTICAL_ADVICE[adviceKey]) {
+    if (sinsal.includes("원진살")) adviceKey = "원진살_토일간";
+    else if (missingSipsung.includes("정관") || missingSipsung.includes("편관")) adviceKey = "무관_자유";
+    else adviceKey = "비겁강_독립"; // 최종 Fallback
+  }
+
+  const advice = PRACTICAL_ADVICE[adviceKey] || PRACTICAL_ADVICE["비겁강_독립"];
+
+  return fillPlaceholders(
+    `현실적인 조언을 드리자면, ${advice.core}. ${advice.detail}. ${advice.positive}. ${advice.action}, ${advice.result}.`,
+    { 일간: dayMaster }
+  );
+}
+
+// ========================================
+
+// 헬퍼 함수
+
+// ========================================
+
+function getElementType(hanja) {
+
+  const map = {
+
+    "갑": "목", "을": "목",
+
+    "병": "화", "정": "화",
+
+    "무": "토", "기": "토",
+
+    "경": "금", "신": "금",
+
+    "임": "수", "계": "수",
+
+    "인": "목", "묘": "목",
+
+    "사": "화", "오": "화",
+
+    "진": "토", "술": "토", "축": "토", "미": "토",
+
+    "신": "금", "유": "금",
+
+    "해": "수", "자": "수"
+
+  };
+
+  return map[hanja] || "";
+
+}
+
+
+1️⃣ 일주별 기본 비유 (60개)
+const DAY_PILLAR_METAPHOR = {
+  // 갑(甲) 시리즈 (5개)
+  "갑자": {
+    core: "호수 위의 거목",
+    image: "물속 깊이 뿌리내린 수양버들",
+    nature: "고요한 물가에 서 있는 든든한 나무"
+  },
+  "갑인": {
+    core: "봄날의 첫 새싹",
+    image: "산비탈을 뚫고 나온 참나무",
+    nature: "생명력 넘치는 산속의 왕자"
+  },
+  "갑진": {
+    core: "구름 속의 용소나무",
+    image: "안개 낀 산꼭대기의 고목",
+    nature: "하늘과 맞닿은 신령스러운 거목"
+  },
+  "갑오": {
+    core: "타오르는 횃불 기둥",
+    image: "햇살을 받아 빛나는 정원수",
+    nature: "열정으로 불타는 중심축"
+  },
+  "갑신": {
+    core: "도끼를 맞은 나무",
+    image: "벌목장의 단단한 원목",
+    nature: "시련을 견디며 강해진 기둥"
+  },
+  "갑술": {
+    core: "산정상의 외로운 소나무",
+    image: "황량한 들판에 홀로 선 나무",
+    nature: "고독 속에서 피어난 철학자"
+  },
+  
+  // 을(乙) 시리즈 (6개)
+  "을축": {
+    core: "겨울 논의 보리싹",
+    image: "얼어붙은 땅을 뚫고 나온 줄기",
+    nature: "역경 속에서 버티는 생명줄"
+  },
+  "을묘": {
+    core: "정원의 덩굴장미",
+    image: "담장을 타고 오르는 아이비",
+    nature: "유연하게 세상을 감싸 안는 포옹"
+  },
+  "을사": {
+    core: "뜨거운 열사의 풀잎",
+    image: "화염 속에서도 살아남은 덤불",
+    nature: "타들어가면서도 꺾이지 않는 의지"
+  },
+  "을미": {
+    core: "사막의 선인장 가시",
+    image: "모래언덕에 뿌리내린 다육식물",
+    nature: "건조함 속에서 수분을 머금은 보석"
+  },
+  "을유": {
+    core: "가을 수확의 벼 이삭",
+    image: "낫에 베어지는 황금빛 곡식",
+    nature: "결실의 순간을 맞이한 결정체"
+  },
+  "을해": {
+    core: "수면 위를 떠다니는 연잎",
+    image: "연못 가득 펼쳐진 수련",
+    nature: "흐름에 몸을 맡긴 떠도는 영혼"
+  },
+  
+  // 병(丙) 시리즈 (6개)
+  "병자": {
+    core: "한겨울 밤하늘의 별빛",
+    image: "어둠을 밝히는 등대",
+    nature: "추위 속에서도 꺼지지 않는 희망"
+  },
+  "병인": {
+    core: "새벽녘의 태양",
+    image: "산등성이를 넘어오는 아침해",
+    nature: "모든 것을 깨우는 시작의 나팔"
+  },
+  "병진": {
+    core: "용의 입에서 뿜어지는 불꽃",
+    image: "폭발 직전의 화산 용암",
+    nature: "억눌린 에너지가 분출되는 순간"
+  },
+  "병오": {
+    core: "한여름 대낮의 작열",
+    image: "사막 위를 달리는 태양마차",
+    nature: "극한으로 치달은 열정의 화신"
+  },
+  "병신": {
+    core: "석양의 마지막 불빛",
+    image: "대장간의 달궈진 쇳덩이",
+    nature: "끝까지 타오르며 형태를 만드는 장인"
+  },
+  "병술": {
+    core: "캠프파이어의 온기",
+    image: "황혼 무렵 모닥불",
+    nature: "사람들을 모으는 따뜻한 중심"
+  },
+  
+  // 정(丁) 시리즈 (6개)
+  "정축": {
+    core: "눈 속에 묻힌 촛불",
+    image: "동굴 안의 작은 불씨",
+    nature: "꺼질 듯 살아남은 내면의 빛"
+  },
+  "정묘": {
+    core: "봄날 아침의 햇살",
+    image: "창문을 통해 들어오는 따스한 빛줄기",
+    nature: "부드럽게 스며드는 온화함"
+  },
+  "정사": {
+    core: "용광로 안의 청화",
+    image: "보석을 녹이는 정밀한 불꽃",
+    nature: "세밀하게 조각하는 예술가의 열정"
+  },
+  "정미": {
+    core: "저녁노을의 잔광",
+    image: "수평선 너머로 사라지는 붉은 빛",
+    nature: "하루를 마무리하는 아쉬움"
+  },
+  "정유": {
+    core: "도자기 가마의 불길",
+    image: "금속을 단련하는 정제된 열",
+    nature: "완벽을 추구하는 장인의 손길"
+  },
+  "정해": {
+    core: "물속에 비친 달빛",
+    image: "호수에 떠 있는 등불",
+    nature: "흔들리지만 꺼지지 않는 신념"
+  },
+  
+  // 무(戊) 시리즈 (6개)
+  "무자": {
+    core: "강가의 축축한 진흙",
+    image: "댐을 막아선 견고한 제방",
+    nature: "흐름을 제어하는 거대한 벽"
+  },
+  "무인": {
+    core: "산맥의 거대한 능선",
+    image: "하늘을 떠받치는 바위산",
+    nature: "움직이지 않는 대지의 왕"
+  },
+  "무진": {
+    core: "안개 낀 습지의 늪",
+    image: "구름 속에 감춰진 고원",
+    nature: "신비로움에 싸인 고립된 요새"
+  },
+  "무오": {
+    core: "사막의 모래언덕",
+    image: "열기로 일렁이는 평원",
+    nature: "끝없이 펼쳐진 고독한 광야"
+  },
+  "무신": {
+    core: "금맥이 숨어 있는 암반",
+    image: "광산 깊숙이 자리한 광석층",
+    nature: "가치를 품고 있는 숨겨진 보물"
+  },
+  "무술": {
+    core: "성벽을 이룬 거친 돌무더기",
+    image: "요새를 지키는 견고한 성곽",
+    nature: "외부를 차단하는 방어의 철벽"
+  },
+  
+  // 기(己) 시리즈 (6개)
+  "기축": {
+    core: "겨울 들판의 얼어붙은 흙",
+    image: "서리 내린 논밭",
+    nature: "차갑게 굳어버린 닫힌 마음"
+  },
+  "기묘": {
+    core: "화분 속의 비옥한 배양토",
+    image: "정원사의 손길이 닿은 텃밭",
+    nature: "정성으로 가꿔진 풍요의 땅"
+  },
+  "기사": {
+    core: "용암이 식어 만들어진 화산토",
+    image: "뜨거움을 머금은 검은 흙",
+    nature: "폭발 후 재생을 준비하는 회복력"
+  },
+  "기미": {
+    core: "한여름 뙤약볕의 밭",
+    image: "작렬하는 태양 아래 갈라진 대지",
+    nature: "극한의 건조함 속에서 견디는 인내"
+  },
+  "기유": {
+    core: "수확 후 남은 빈 논",
+    image: "금빛 가을 들판의 흙",
+    nature: "결실을 내주고 쉬고 있는 어머니"
+  },
+  "기해": {
+    core: "강물에 휩쓸리는 젖은 진흙",
+    image: "범람한 논의 질척한 땅",
+    nature: "물에 잠긴 채 형체를 잃은 혼란"
+  },
+  
+  // 경(庚) 시리즈 (6개)
+  "경자": {
+    core: "얼음 속에 갇힌 무쇠",
+    image: "겨울 호수 밑바닥의 차가운 금속",
+    nature: "냉철함으로 무장한 얼어붙은 칼날"
+  },
+  "경인": {
+    core: "도끼날처럼 날카로운 철",
+    image: "나무를 베는 벌목꾼의 연장",
+    nature: "거침없이 앞으로 나아가는 파괴자"
+  },
+  "경진": {
+    core: "광산 깊숙이 잠든 원석",
+    image: "아직 빛을 보지 못한 다이아몬드",
+    nature: "잠재력을 숨긴 미완의 보석"
+  },
+  "경오": {
+    core: "대장간의 달궈진 검",
+    image: "불꽃 속에서 벼려진 예리한 날",
+    nature: "시련을 통해 완성된 명검"
+  },
+  "경신": {
+    core: "금고 속의 순금 덩어리",
+    image: "정제된 99.9% 순도의 귀금속",
+    nature: "완벽을 추구하는 순수함의 결정"
+  },
+  "경술": {
+    core: "녹슨 채 땅에 묻힌 고철",
+    image: "폐허에 버려진 무기",
+    nature: "과거의 영광을 간직한 퇴물"
+  },
+  
+  // 신(辛) 시리즈 (6개)
+  "신축": {
+    core: "땅속에 묻힌 보석 원석",
+    image: "차가운 암반 속 루비",
+    nature: "세상에 드러나지 않은 숨겨진 가치"
+  },
+  "신묘": {
+    core: "정교하게 세공된 금반지",
+    image: "장인의 손길로 다듬어진 장신구",
+    nature: "섬세함의 극치를 보여주는 예술품"
+  },
+  "신사": {
+    core: "용광로에서 녹아내리는 은",
+    image: "액체 상태로 흐르는 귀금속",
+    nature: "형태를 바꾸며 변신하는 유연함"
+  },
+  "신미": {
+    core: "사막 모래 속 금가루",
+    image: "햇빛에 반짝이는 미세한 금빛",
+    nature: "희소하지만 존재하는 작은 행운"
+  },
+  "신유": {
+    core: "왕관을 장식한 백금",
+    image: "순백의 빛을 내는 최고급 금속",
+    nature: "고귀함과 순수함의 상징"
+  },
+  "신해": {
+    core: "물속에 가라앉은 진주",
+    image: "조개 속에서 자라나는 영롱한 구슬",
+    nature: "고통 속에서 탄생한 아름다움"
+  },
+  
+  // 임(壬) 시리즈 (6개)
+  "임자": {
+    core: "깊은 바다의 암류",
+    image: "수면 아래 소용돌이치는 해류",
+    nature: "겉으로 드러나지 않는 거대한 흐름"
+  },
+  "임인": {
+    core: "산골짜기를 따라 흐르는 계곡물",
+    image: "바위를 깎아내리는 폭포수",
+    nature: "거침없이 길을 개척하는 역동성"
+  },
+  "임진": {
+    core: "구름 속에 갇힌 빗방울",
+    image: "용이 머무는 호수",
+    nature: "잠재된 에너지를 품은 신비로운 연못"
+  },
+  "임오": {
+    core: "끓어오르는 온천수",
+    image: "수증기를 뿜어내는 간헐천",
+    nature: "폭발적으로 분출되는 열정"
+  },
+  "임신": {
+    core: "맑게 정제된 샘물",
+    image: "바위틈에서 솟아나는 생수",
+    nature: "순수함을 유지하는 투명한 영혼"
+  },
+  "임술": {
+    core: "저수지에 고인 물",
+    image: "댐에 가둬진 담수",
+    nature: "억눌려 있지만 폭발 직전인 감정"
+  },
+  
+  // 계(癸) 시리즈 (6개)
+  "계축": {
+    core: "겨울 안개처럼 스미는 습기",
+    image: "차가운 이슬방울",
+    nature: "조용히 스며들어 적시는 섬세함"
+  },
+  "계묘": {
+    core: "봄비에 젖은 풀잎의 물방울",
+    image: "새싹을 키우는 단비",
+    nature: "생명을 키워내는 은은한 자비"
+  },
+  "계사": {
+    core: "찜통 속의 김이 오른 증기",
+    image: "뜨거운 수증기",
+    nature: "보이지 않지만 뜨거운 내면"
+  },
+  "계미": {
+    core: "한낮의 아지랑이",
+    image: "햇빛에 일렁이는 신기루",
+    nature: "있는 듯 없는 듯한 몽환적 존재"
+  },
+  "계유": {
+    core: "가을 빗속의 냉기",
+    image: "차갑게 내리는 소나기",
+    nature: "날카롭게 파고드는 냉정함"
+  },
+  "계해": {
+    core: "깊은 바다 밑바닥의 어둠",
+    image: "끝없이 깊은 심연",
+    nature: "누구도 알 수 없는 비밀을 품은 우주"
+  }
+};
+
+2️⃣ 오행 환경 묘사 (25개 조합)
+const FIVE_ELEMENTS_ENVIRONMENT = {
+  // 목(木) 관련 (4개)
+  "목과다": [
+    "울창한 밀림이 뒤덮인",
+    "수풀이 사방을 가득 메운",
+    "빽빽한 숲속 깊은 곳의"
+  ],
+  "목적당": [
+    "나무가 적당히 우거진",
+    "숲과 평야가 조화로운"
+  ],
+  "목부족": [
+    "나무 한 그루 보이지 않는",
+    "풀 한 포기 없는 황무지",
+    "초목이 전멸한 땅"
+  ],
+  "목전무": [
+    "식물이 자랄 수 없는",
+    "생명의 흔적이 사라진"
+  ],
+  
+  // 화(火) 관련 (4개)
+  "화과다": [
+    "타오르는 불길이 휘몰아치는",
+    "용암이 분출하는",
+    "열기로 달아오른"
+  ],
+  "화적당": [
+    "온화한 불빛이 비추는",
+    "따스한 햇살이 내리쬐는"
+  ],
+  "화부족": [
+    "차디찬 냉기만 감도는",
+    "온기라곤 찾아볼 수 없는",
+    "얼어붙어 꽁꽁 언"
+  ],
+  "화전무": [
+    "빛 한 줄기 들지 않는",
+    "동토처럼 얼어붙은"
+  ],
+  
+  // 토(土) 관련 (4개)
+  "토과다": [
+    "거대한 산맥이 겹겹이 쌓인",
+    "바위산이 하늘을 찌르는",
+    "흙더미가 산처럼 쌓인"
+  ],
+  "토적당": [
+    "평탄한 들판이 펼쳐진",
+    "비옥한 대지가 자리한"
+  ],
+  "토부족": [
+    "땅이 흔들리는 불안정한",
+    "기반이 약한"
+  ],
+  "토전무": [
+    "발 디딜 땅조차 없는",
+    "공중에 떠 있는 듯한"
+  ],
+  
+  // 금(金) 관련 (4개)
+  "금과다": [
+    "날카로운 칼날들이 빼곡한",
+    "차가운 쇳덩이가 가득한",
+    "금속 파편이 흩어진"
+  ],
+  "금적당": [
+    "반짝이는 보석이 박힌",
+    "적당히 단단한"
+  ],
+  "금부족": [
+    "무르고 푸석한",
+    "단단함이 부족한"
+  ],
+  "금전무": [
+    "형체를 잡아줄 뼈대가 없는",
+    "흐물흐물한"
+  ],
+  
+  // 수(水) 관련 (5개)
+  "수과다": [
+    "거센 파도가 몰아치는",
+    "폭우가 억수로 쏟아지는",
+    "물결이 출렁이는",
+    "홍수가 범람한"
+  ],
+  "수적당": [
+    "잔잔한 호수가 있는",
+    "시냇물이 흐르는"
+  ],
+  "수부족": [
+    "바싹 말라버린",
+    "갈라진 틈이 벌어진",
+    "수분기 하나 없는"
+  ],
+  "수전무": [
+    "사막보다 더 메마른",
+    "타들어가는"
+  ],
+  
+  // 복합 (4개)
+  "목화왕": [
+    "푸르른 숲에 햇살이 쏟아지는",
+    "초목이 불타듯 자라나는"
+  ],
+  "금수조화": [
+    "차가운 금속 사이로 물이 흐르는",
+    "얼음장 같은 호수 밑의"
+  ],
+  "화토건조": [
+    "뜨겁고 푸석푸석한",
+    "작열하는 모래언덕의"
+  ],
+  "수목생장": [
+    "물을 머금고 쑥쑥 자라는",
+    "촉촉하게 젖은 숲속의"
+  ]
+};
+
+3️⃣ 신살별 긴장감/특징 표현 (20개)
+const SINSAL_TENSION = {
+  // 부정적 긴장감
+  "원진살": "아슬아슬하게 균형 잡힌",
+  "귀문관살": "음침하게 드리워진",
+  "충": "폭풍처럼 휘몰아치는",
+  "형": "뒤틀리고 일그러진",
+  "백호살": "날카로운 발톱이 도사린",
+  "양인살": "피비린내 나는",
+  "도화살_부정": "유혹이 넘치는",
+  
+  // 중립/역동
+  "역마살": "끊임없이 움직이는",
+  "화개살": "신비로운 안개에 싸인",
+  "공망": "텅 빈 듯한",
+  
+  // 긍정적
+  "천을귀인": "축복받은",
+  "태극귀인": "기운이 충만한",
+  "문창귀인": "영롱한 지혜가 깃든",
+  "학당귀인": "학문의 빛이 비치는",
+  "복성귀인": "행운이 감도는",
+  "천덕귀인": "은혜로운",
+  "월덕귀인": "온화한 달빛이 내리는",
+  
+  // 기타
+  "도화살_긍정": "화려하게 빛나는",
+  "홍염살": "뜨겁게 타오르는",
+  "현침살": "날카롭게 관통하는"
+};
+
+📦 4. DAY_PILLAR_DUALITY (60개)
+const DAY_PILLAR_DUALITY = {
+  // 갑(甲) 시리즈
+  "갑자": {
+    outside: "잔잔하고 평온해 보이지만",
+    inside: "깊은 물속처럼 헤아릴 수 없는 깊이를 품은",
+    keyword: "심해심성",
+    strength: "통찰력과 인내력"
+  },
+  "갑인": {
+    outside: "온화하고 부드러워 보이지만",
+    inside: "하늘을 향한 야망과 강철 같은 의지를 품은",
+    keyword: "온유강직",
+    strength: "추진력과 리더십"
+  },
+  "갑진": {
+    outside: "신비롭고 초연해 보이지만",
+    inside: "용처럼 숨겨진 힘과 카리스마를 지닌",
+    keyword: "신비권위",
+    strength: "통제력과 영향력"
+  },
+  "갑오": {
+    outside: "밝고 활기차 보이지만",
+    inside: "불타는 열정과 멈출 수 없는 욕망을 품은",
+    keyword: "화려열정",
+    strength: "창의력과 순발력"
+  },
+  "갑신": {
+    outside: "단단하고 강해 보이지만",
+    inside: "시련을 딛고 일어서는 불굴의 정신을 가진",
+    keyword: "강인불굴",
+    strength: "극복력과 생존력"
+  },
+  "갑술": {
+    outside: "묵묵하고 고독해 보이지만",
+    inside: "홀로 서서 세상을 품는 철학자의 혼을 지닌",
+    keyword: "고독철학",
+    strength: "사색과 통찰"
+  },
+  
+  // 을(乙) 시리즈
+  "을축": {
+    outside: "바람에 하늘거리는 꽃처럼 여리여리하고 부드러워 보이지만",
+    inside: "바위를 뚫을 정도로 집요하고 생존력이 강한",
+    keyword: "외유내강",
+    strength: "끈질긴 생명력"
+  },
+  "을묘": {
+    outside: "섬세하고 여린 듯 보이지만",
+    inside: "유연하게 상황을 휘감아 제압하는",
+    keyword: "유연강인",
+    strength: "적응력과 끈기"
+  },
+  "을사": {
+    outside: "우아하고 품위 있어 보이지만",
+    inside: "뜨거운 열기 속에서도 꺾이지 않는 근성을 품은",
+    keyword: "우아근성",
+    strength: "불굴의 의지"
+  },
+  "을미": {
+    outside: "소박하고 평범해 보이지만",
+    inside: "척박한 환경에서도 꽃을 피우는 저력을 지닌",
+    keyword: "소박저력",
+    strength: "인내와 성취"
+  },
+  "을유": {
+    outside: "우아하고 세련돼 보이지만",
+    inside: "예리하게 상황을 분석하는 냉철함을 가진",
+    keyword: "우아냉철",
+    strength: "분석력과 판단력"
+  },
+  "을해": {
+    outside: "유연하고 물 흐르듯 자연스러워 보이지만",
+    inside: "깊은 바다처럼 측량할 수 없는 감성을 품은",
+    keyword: "유연심해",
+    strength: "감수성과 공감력"
+  },
+  
+  // 병(丙) 시리즈
+  "병자": {
+    outside: "차갑고 냉정해 보이지만",
+    inside: "어둠을 밝히는 뜨거운 불빛을 숨긴",
+    keyword: "외냉내열",
+    strength: "희망과 헌신"
+  },
+  "병인": {
+    outside: "밝고 활기차 보이지만",
+    inside: "모든 것을 태워버릴 듯한 폭발적 에너지를 숨긴",
+    keyword: "외화내폭",
+    strength: "열정과 추진력"
+  },
+  "병진": {
+    outside: "신비롭고 조용해 보이지만",
+    inside: "용암처럼 끓어오르는 감춰진 힘을 품은",
+    keyword: "신비폭발",
+    strength: "잠재력과 폭발력"
+  },
+  "병오": {
+    outside: "화려하고 당당해 보이지만",
+    inside: "모든 것을 불태우는 극한의 열정을 지닌",
+    keyword: "화려극한",
+    strength: "카리스마와 영향력"
+  },
+  "병신": {
+    outside: "세련되고 차가워 보이지만",
+    inside: "단련된 검처럼 예리한 본질을 품은",
+    keyword: "세련예리",
+    strength: "정확성과 완성도"
+  },
+  "병술": {
+    outside: "온화하고 따뜻해 보이지만",
+    inside: "사람들을 끌어당기는 자석 같은 매력을 지닌",
+    keyword: "온화매력",
+    strength: "포용력과 친화력"
+  },
+  
+  // 정(丁) 시리즈
+  "정축": {
+    outside: "소극적이고 수줍어 보이지만",
+    inside: "꺼지지 않는 불씨처럼 집요한 열정을 품은",
+    keyword: "소극집요",
+    strength: "끈기와 집중력"
+  },
+  "정묘": {
+    outside: "부드럽고 따스해 보이지만",
+    inside: "섬세하게 조각하는 장인의 정신을 지닌",
+    keyword: "부드장인",
+    strength: "세밀함과 완벽주의"
+  },
+  "정사": {
+    outside: "차분하고 섬세해 보이지만",
+    inside: "치밀하게 계산하며 목표를 향해 나아가는",
+    keyword: "세밀치밀",
+    strength: "정밀함과 집중력"
+  },
+  "정미": {
+    outside: "수수하고 소박해 보이지만",
+    inside: "서서히 타오르는 불꽃처럼 지속력을 품은",
+    keyword: "소박지속",
+    strength: "인내와 성실"
+  },
+  "정유": {
+    outside: "고상하고 우아해 보이지만",
+    inside: "보석을 깎아내는 정교함을 지닌",
+    keyword: "우아정교",
+    strength: "섬세함과 기술력"
+  },
+  "정해": {
+    outside: "유연하고 순응적으로 보이지만",
+    inside: "물속에 비친 달빛처럼 흔들려도 꺼지지 않는 신념을 가진",
+    keyword: "유연신념",
+    strength: "회복력과 적응력"
+  },
+  
+  // 무(戊) 시리즈
+  "무자": {
+    outside: "무겁고 느려 보이지만",
+    inside: "홍수를 막는 제방처럼 든든한 책임감을 품은",
+    keyword: "중후책임",
+    strength: "신뢰와 안정성"
+  },
+  "무인": {
+    outside: "우직하고 단순해 보이지만",
+    inside: "산맥처럼 움직이지 않는 중심축을 가진",
+    keyword: "우직중심",
+    strength: "불변과 신념"
+  },
+  "무진": {
+    outside: "무뚝뚝하고 느려 보이지만",
+    inside: "산처럼 흔들리지 않는 중심을 가진",
+    keyword: "부동심",
+    strength: "안정성과 신뢰감"
+  },
+  "무오": {
+    outside: "강렬하고 거칠어 보이지만",
+    inside: "사막처럼 광활한 포용력을 품은",
+    keyword: "강렬포용",
+    strength: "스케일과 기백"
+  },
+  "무신": {
+    outside: "단단하고 차가워 보이지만",
+    inside: "금맥을 품은 산처럼 가치를 숨긴",
+    keyword: "단단가치",
+    strength: "잠재력과 저력"
+  },
+  "무술": {
+    outside: "투박하고 거칠어 보이지만",
+    inside: "성벽처럼 사람을 지키는 충성심을 지닌",
+    keyword: "투박충성",
+    strength: "보호본능과 헌신"
+  },
+  
+  // 기(己) 시리즈
+  "기축": {
+    outside: "차갑고 경직돼 보이지만",
+    inside: "얼어붙은 땅 속 씨앗처럼 봄을 준비하는",
+    keyword: "경직준비",
+    strength: "인내와 기다림"
+  },
+  "기묘": {
+    outside: "소박하고 평범해 보이지만",
+    inside: "비옥한 토양처럼 풍요를 만드는 힘을 품은",
+    keyword: "소박풍요",
+    strength: "생산성과 실속"
+  },
+  "기사": {
+    outside: "소박하고 평범해 보이지만",
+    inside: "용암처럼 뜨겁게 끓어오르는 욕망을 품은",
+    keyword: "내열외냉",
+    strength: "폭발적 잠재력"
+  },
+  "기미": {
+    outside: "조용하고 차분해 보이지만",
+    inside: "뜨거운 열정과 현실적인 욕망이 용암처럼 끓고 있는",
+    keyword: "외유내강",
+    strength: "생존 본능과 생활력"
+  },
+  "기유": {
+    outside: "차분하고 담담해 보이지만",
+    inside: "수확을 마친 들판처럼 여유와 지혜를 품은",
+    keyword: "담담여유",
+    strength: "성숙함과 통찰"
+  },
+  "기해": {
+    outside: "유연하고 순응적으로 보이지만",
+    inside: "흙탕물처럼 혼란스러운 감정을 숨긴",
+    keyword: "유연혼란",
+    strength: "변화 적응력"
+  },
+  
+  // 경(庚) 시리즈
+  "경자": {
+    outside: "차갑고 냉정해 보이지만",
+    inside: "누구보다 뜨거운 정의감을 숨긴",
+    keyword: "외냉내열",
+    strength: "신념과 원칙"
+  },
+  "경인": {
+    outside: "강하고 날카로워 보이지만",
+    inside: "거침없이 앞으로 나아가는 파괴자의 용기를 지닌",
+    keyword: "강인파괴",
+    strength: "돌파력과 결단력"
+  },
+  "경진": {
+    outside: "거칠고 투박해 보이지만",
+    inside: "다이아몬드 원석처럼 빛날 잠재력을 품은",
+    keyword: "투박잠재",
+    strength: "미완의 보석"
+  },
+  "경오": {
+    outside: "강렬하고 뜨거워 보이지만",
+    inside: "단련된 명검처럼 예리한 본질을 지닌",
+    keyword: "강렬예리",
+    strength: "완성도와 날카로움"
+  },
+  "경신": {
+    outside: "차갑고 완벽해 보이지만",
+    inside: "순금처럼 흔들림 없는 순수함을 품은",
+    keyword: "완벽순수",
+    strength: "원칙과 고집"
+  },
+  "경술": {
+    outside: "낡고 쓸모없어 보이지만",
+    inside: "과거의 영광을 간직한 역사를 품은",
+    keyword: "낙후역사",
+    strength: "경험과 연륜"
+  },
+  
+  // 신(辛) 시리즈
+  "신축": {
+    outside: "수줍고 소극적으로 보이지만",
+    inside: "땅속 보석처럼 빛나는 가치를 숨긴",
+    keyword: "소극가치",
+    strength: "숨겨진 재능"
+  },
+  "신묘": {
+    outside: "섬세하고 우아해 보이지만",
+    inside: "정교하게 세공된 예술품 같은 완성도를 지닌",
+    keyword: "우아완성",
+    strength: "섬세함과 예술성"
+  },
+  "신사": {
+    outside: "고상하고 품위 있어 보이지만",
+    inside: "녹아내리며 형태를 바꾸는 유연함을 품은",
+    keyword: "고상유연",
+    strength: "변신과 적응"
+  },
+  "신미": {
+    outside: "소박하고 수수해 보이지만",
+    inside: "모래 속 금가루처럼 희소한 가치를 지닌",
+    keyword: "소박희소",
+    strength: "작지만 귀함"
+  },
+  "신유": {
+    outside: "고상하고 우아해 보이지만",
+    inside: "계산적이고 현실적인 판단력을 지닌",
+    keyword: "우아현실",
+    strength: "세련된 실리추구"
+  },
+  "신해": {
+    outside: "유연하고 순응적으로 보이지만",
+    inside: "진주처럼 고통 속에서 탄생한 아름다움을 품은",
+    keyword: "유연고통",
+    strength: "역경을 통한 성장"
+  },
+  
+  // 임(壬) 시리즈
+  "임자": {
+    outside: "잔잔하고 평온해 보이지만",
+    inside: "깊은 바다처럼 헤아릴 수 없는 깊이를 품은",
+    keyword: "평온심해",
+    strength: "깊이와 통찰"
+  },
+  "임인": {
+    outside: "유연하고 부드러워 보이지만",
+    inside: "폭포수처럼 거침없는 추진력을 지닌",
+    keyword: "유연추진",
+    strength: "역동성과 개척력"
+  },
+  "임진": {
+    outside: "신비롭고 초연해 보이지만",
+    inside: "용이 숨은 호수처럼 거대한 힘을 품은",
+    keyword: "신비거대",
+    strength: "잠재된 파워"
+  },
+  "임오": {
+    outside: "뜨겁고 역동적으로 보이지만",
+    inside: "끓어오르는 온천처럼 폭발 직전의 에너지를 품은",
+    keyword: "역동폭발",
+    strength: "열정과 순발력"
+  },
+  "임신": {
+    outside: "맑고 깨끗해 보이지만",
+    inside: "바위틈 샘물처럼 순수함을 고집하는",
+    keyword: "청순고집",
+    strength: "순수함과 원칙"
+  },
+  "임술": {
+    outside: "잔잔하고 고요해 보이지만",
+    inside: "댐에 가둬진 물처럼 폭발 직전의 감정을 숨긴",
+    keyword: "고요폭발",
+    strength: "억눌린 열정"
+  },
+  
+  // 계(癸) 시리즈
+  "계축": {
+    outside: "소극적이고 수동적으로 보이지만",
+    inside: "이슬방울처럼 조용히 스며드는 영향력을 품은",
+    keyword: "소극침투",
+    strength: "은밀한 영향력"
+  },
+  "계묘": {
+    outside: "부드럽고 따스해 보이지만",
+    inside: "단비처럼 생명을 키우는 자비를 지닌",
+    keyword: "부드자비",
+    strength: "양육과 배려"
+  },
+  "계사": {
+    outside: "조용하고 차분해 보이지만",
+    inside: "뜨거운 증기처럼 보이지 않는 열정을 품은",
+    keyword: "차분열정",
+    strength: "은밀한 에너지"
+  },
+  "계미": {
+    outside: "몽환적이고 불확실해 보이지만",
+    inside: "아지랑이처럼 있는 듯 없는 듯한 신비로움을 지닌",
+    keyword: "몽환신비",
+    strength: "감성과 직관"
+  },
+  "계유": {
+    outside: "차갑고 날카로워 보이지만",
+    inside: "가을비처럼 냉정하게 파고드는 통찰력을 품은",
+    keyword: "냉정통찰",
+    strength: "예리한 관찰력"
+  },
+  "계해": {
+    outside: "유연하고 순응적으로 보이지만",
+    inside: "심연처럼 누구도 알 수 없는 비밀을 품은",
+    keyword: "유연심연",
+    strength: "깊이와 신비"
+  }
+};
+
+📦 5. DAY_PILLAR_ENVIRONMENT (60개)
+const DAY_PILLAR_ENVIRONMENT = {
+  "갑자": {
+    season: "한겨울",
+    climate: "차갑고 습한",
+    detail: "얼어붙은 호수 위의 나무",
+    characteristic: "추위 속에서도 생명을 품고 봄을 기다리는 인내심"
+  },
+  "갑인": {
+    season: "봄",
+    climate: "따뜻하고 생동하는",
+    detail: "봄날의 산림",
+    characteristic: "만물이 소생하는 생명력"
+  },
+  "갑진": {
+    season: "봄",
+    climate: "습하고 안개 낀",
+    detail: "구름 속 산꼭대기",
+    characteristic: "신비롭고 헤아릴 수 없는 깊이"
+  },
+  "갑오": {
+    season: "여름",
+    climate: "뜨겁고 건조한",
+    detail: "한여름의 정원수",
+    characteristic: "빛과 열을 받아 활활 타오르는 생명력"
+  },
+  "갑신": {
+    season: "가을",
+    climate: "선선하고 건조한",
+    detail: "벌목장의 나무",
+    characteristic: "베어지며 쓰임새를 찾는 시련의 과정"
+  },
+  "갑술": {
+    season: "가을",
+    climate: "건조하고 쓸쓸한",
+    detail: "황량한 산정상",
+    characteristic: "고독 속에서 세상을 내려다보는 철학"
+  },
+  
+  "을축": {
+    season: "겨울",
+    climate: "춥고 습한",
+    detail: "동토의 땅",
+    characteristic: "추위 속에서도 생명을 품은 끈질김"
+  },
+  "을묘": {
+    season: "봄",
+    climate: "따뜻하고 촉촉한",
+    detail: "정원의 화단",
+    characteristic: "세심한 손길로 가꿔지는 섬세함"
+  },
+  "을사": {
+    season: "여름",
+    climate: "뜨겁고 건조한",
+    detail: "열사의 풀밭",
+    characteristic: "타들어가면서도 꺾이지 않는 근성"
+  },
+  "을미": {
+    season: "여름",
+    climate: "뜨겁고 메마른",
+    detail: "사막의 다육식물",
+    characteristic: "극한 환경에서도 살아남는 적응력"
+  },
+  "을유": {
+    season: "가을",
+    climate: "선선하고 건조한",
+    detail: "수확의 벼 이삭",
+    characteristic: "결실을 맞이하는 성취의 순간"
+  },
+  "을해": {
+    season: "겨울",
+    climate: "차갑고 습한",
+    detail: "수면 위의 연잎",
+    characteristic: "물 위를 떠다니는 유연한 적응력"
+  },
+  
+  "병자": {
+    season: "한겨울",
+    climate: "차갑고 어두운",
+    detail: "밤하늘의 별빛",
+    characteristic: "어둠 속에서도 희망을 밝히는 빛"
+  },
+  "병인": {
+    season: "봄",
+    climate: "따뜻하고 생기 있는",
+    detail: "새벽녘의 태양",
+    characteristic: "모든 것을 깨우는 시작의 에너지"
+  },
+  "병진": {
+    season: "봄",
+    climate: "습하고 뜨거운",
+    detail: "화산의 용암",
+    characteristic: "폭발 직전의 억눌린 에너지"
+  },
+  "병오": {
+    season: "한여름",
+    climate: "작열하는 뜨거운",
+    detail: "대낮의 불덩이",
+    characteristic: "극한으로 치달은 열정"
+  },
+  "병신": {
+    season: "가을",
+    climate: "서늘하지만 따뜻한",
+    detail: "석양의 노을",
+    characteristic: "끝까지 타오르며 아름다움을 남김"
+  },
+  "병술": {
+    season: "가을",
+    climate: "따뜻하고 포근한",
+    detail: "모닥불의 온기",
+    characteristic: "사람들을 모으는 중심의 따뜻함"
+  },
+  
+  "정축": {
+    season: "겨울",
+    climate: "차갑고 습한",
+    detail: "눈 속의 촛불",
+    characteristic: "꺼질 듯 말 듯 살아남은 불씨"
+  },
+  "정묘": {
+    season: "봄",
+    climate: "따뜻하고 부드러운",
+    detail: "아침 햇살",
+    characteristic: "창문을 통해 스며드는 온화함"
+  },
+  "정사": {
+    season: "여름",
+    climate: "뜨겁고 정밀한",
+    detail: "보석공의 불꽃",
+    characteristic: "세밀하게 조각하는 장인정신"
+  },
+  "정미": {
+    season: "여름",
+    climate: "따뜻하지만 저물어가는",
+    detail: "저녁노을",
+    characteristic: "하루를 마무리하는 아쉬움과 여운"
+  },
+  "정유": {
+    season: "가을",
+    climate: "선선하고 정교한",
+    detail: "도자기 가마의 불",
+    characteristic: "완벽을 향한 정제된 열정"
+  },
+  "정해": {
+    season: "겨울",
+    climate: "차갑고 흔들리는",
+    detail: "물 위의 등불",
+    characteristic: "흔들려도 꺼지지 않는 신념"
+  },
+  
+  "무자": {
+    season: "한겨울",
+    climate: "차갑고 무거운",
+    detail: "강가의 진흙 제방",
+    characteristic: "흐름을 막아서는 든든한 방어벽"
+  },
+  "무인": {
+    season: "봄",
+    climate: "든든하고 안정적인",
+    detail: "산맥의 능선",
+    characteristic: "움직이지 않는 대지의 중심축"
+  },
+  "무진": {
+    season: "봄",
+    climate: "습하고 무거운",
+    detail: "안개 낀 늪",
+    characteristic: "신비롭고 고립된 요새"
+  },
+  "무오": {
+    season: "한여름",
+    climate: "뜨겁고 건조한",
+    detail: "사막의 모래언덕",
+    characteristic: "끝없이 펼쳐진 광활한 대지"
+  },
+  "무신": {
+    season: "가을",
+    climate: "차갑고 단단한",
+    detail: "금맥이 숨은 암반",
+    characteristic: "가치를 숨기고 있는 보물창고"
+  },
+  "무술": {
+    season: "가을",
+    climate: "건조하고 거친",
+    detail: "성벽의 돌무더기",
+    characteristic: "외부를 막아서는 방어의 철벽"
+  },
+  
+  "기축": {
+    season: "겨울",
+    climate: "차갑고 얼어붙은",
+    detail: "겨울 들판의 흙",
+    characteristic: "얼어서 굳어버린 닫힌 마음"
+  },
+  "기묘": {
+    season: "봄",
+    climate: "따뜻하고 비옥한",
+    detail: "화분의 배양토",
+    characteristic: "정성으로 가꿔진 풍요로운 땅"
+  },
+  "기사": {
+    season: "여름",
+    climate: "뜨겁고 강렬한",
+    detail: "화산토",
+    characteristic: "폭발 후 재생을 준비하는 회복력"
+  },
+  "기미": {
+    season: "여름",
+    climate: "뜨겁고 건조한",
+    detail: "여름의 밭 흙",
+    characteristic: "열기로 갈라진 대지처럼 강렬한 에너지"
+  },
+  "기유": {
+    season: "가을",
+    climate: "선선하고 풍요로운",
+    detail: "수확 후의 논",
+    characteristic: "결실을 내주고 쉬는 어머니의 품"
+  },
+  "기해": {
+    season: "겨울",
+    climate: "차갑고 질척한",
+    detail: "범람한 논의 진흙",
+    characteristic: "물에 잠겨 형체를 잃은 혼란"
+  },
+  
+  "경자": {
+    season: "한겨울",
+    climate: "차갑고 냉혹한",
+    detail: "얼음 속의 무쇠",
+    characteristic: "냉철함으로 무장한 얼어붙은 칼날"
+  },
+  "경인": {
+    season: "봄",
+    climate: "날카롭고 거친",
+    detail: "도끼날",
+    characteristic: "거침없이 나무를 베는 파괴력"
+  },
+  "경진": {
+    season: "봄",
+    climate: "습하고 숨겨진",
+    detail: "광산 속 원석",
+    characteristic: "빛을 보지 못한 미완의 보석"
+  },
+  "경오": {
+    season: "한여름",
+    climate: "뜨겁고 단련된",
+    detail: "대장간의 검",
+    characteristic: "불꽃 속에서 벼려진 예리함"
+  },
+  "경신": {
+    season: "가을",
+    climate: "차갑고 완벽한",
+    detail: "순금 덩어리",
+    characteristic: "정제된 순수함의 극치"
+  },
+  "경술": {
+    season: "가을",
+    climate: "건조하고 낡은",
+    detail: "녹슨 고철",
+    characteristic: "과거의 영광을 간직한 퇴물"
+  },
+  
+  "신축": {
+    season: "겨울",
+    climate: "차갑고 숨겨진",
+    detail: "땅속의 보석",
+    characteristic: "세상에 드러나지 않은 가치"
+  },
+  "신묘": {
+    season: "봄",
+    climate: "따뜻하고 섬세한",
+    detail: "세공된 반지",
+    characteristic: "장인의 손길로 다듬어진 예술품"
+  },
+  "신사": {
+    season: "여름",
+    climate: "뜨겁고 유연한",
+    detail: "녹아내리는 은",
+    characteristic: "형태를 바꾸며 변신하는 유연함"
+  },
+  "신미": {
+    season: "여름",
+    climate: "뜨겁고 희소한",
+    detail: "모래 속 금가루",
+    characteristic: "햇빛에 반짝이는 작은 행운"
+  },
+  "신유": {
+    season: "가을",
+    climate: "고상하고 차가운",
+    detail: "왕관의 백금",
+    characteristic: "고귀함과 순수함의 상징"
+  },
+  "신해": {
+    season: "겨울",
+    climate: "차갑고 깊은",
+    detail: "물속의 진주",
+    characteristic: "고통 속에서 탄생한 아름다움"
+  },
+  
+  "임자": {
+    season: "한겨울",
+    climate: "차갑고 깊은",
+    detail: "깊은 바다",
+    characteristic: "수면 아래 소용돌이치는 거대한 흐름"
+  },
+  "임인": {
+    season: "봄",
+    climate: "역동적이고 흐르는",
+    detail: "산골짜기 계곡물",
+    characteristic: "바위를 깎아내리는 거침없는 흐름"
+  },
+  "임진": {
+    season: "봄",
+    climate: "습하고 신비로운",
+    detail: "용이 사는 호수",
+    characteristic: "잠재된 에너지를 품은 연못"
+  },
+  "임오": {
+    season: "한여름",
+    climate: "뜨겁고 폭발적인",
+    detail: "끓어오르는 온천",
+    characteristic: "수증기를 뿜어내는 간헐천의 열정"
+  },
+  "임신": {
+    season: "가을",
+    climate: "맑고 깨끗한",
+    detail: "바위틈의 샘물",
+    characteristic: "순수함을 유지하는 투명한 영혼"
+  },
+  "임술": {
+    season: "가을",
+    climate: "억눌리고 고인",
+    detail: "저수지의 물",
+    characteristic: "댐에 가둬진 폭발 직전의 감정"
+  },
+  
+  "계축": {
+    season: "겨울",
+    climate: "차갑고 스며드는",
+    detail: "안개와 이슬",
+    characteristic: "조용히 스며들어 적시는 섬세함"
+  },
+  "계묘": {
+    season: "봄",
+    climate: "부드럽고 촉촉한",
+    detail: "봄비",
+    characteristic: "새싹을 키우는 단비의 자비"
+  },
+  "계사": {
+    season: "여름",
+    climate: "뜨겁고 보이지 않는",
+    detail: "증기",
+    characteristic: "보이지 않지만 뜨거운 에너지"
+  },
+  "계미": {
+    season: "여름",
+    climate: "몽환적이고 일렁이는",
+    detail: "아지랑이",
+    characteristic: "있는 듯 없는 듯한 신비로움"
+  },
+  "계유": {
+    season: "가을",
+    climate: "차갑고 냉정한",
+    detail: "가을비",
+    characteristic: "날카롭게 파고드는 냉철함"
+  },
+  "계해": {
+    season: "겨울",
+    climate: "깊고 어두운",
+    detail: "심연",
+    characteristic: "끝없이 깊은 우주의 비밀"
+  }
+};
+
+📦 6. ELEMENT_PATTERN_SENTENCES (30개)
+const ELEMENT_PATTERN_SENTENCES = {
+  // 수(水) 과다 - 5개
+  "수과다_1": {
+    description: "사주 주변에는 {천간수들}이라는 엄청난 물바다가 펼쳐져 있습니다",
+    challenge: "이 많은 물을 혼자서 감당하고 조절해야 하니 삶의 난이도가 결코 낮지 않지만",
+    reward: "그만큼 성취했을 때의 보상도 확실한 구조입니다"
+  },
+  "수과다_2": {
+    description: "월지와 시지의 {지지수들}라는 거대한 물 기운을 마주하고 있습니다",
+    challenge: "작은 {일간}이 감당하기엔 물의 기운(재성)이 상당히 강력하여",
+    reward: "삶의 변동폭이 크고 스케일이 큰 판에서 놀게 됩니다"
+  },
+  "수과다_3": {
+    description: "{개수}개의 물 기운이 사방을 둘러싸고 있습니다",
+    challenge: "홍수처럼 밀려드는 감정과 욕망을 제어하기 어렵지만",
+    reward: "이 에너지를 잘 활용하면 막대한 재물과 기회를 거머쥘 수 있습니다"
+  },
+  "수과다_4": {
+    description: "강물이 사방에서 흘러들어오는 형국입니다",
+    challenge: "물이 넘쳐 방향을 잃기 쉽지만",
+    reward: "흐름을 잘 타면 거대한 파도를 일으킬 수 있습니다"
+  },
+  "수과다_5": {
+    description: "바다를 품은 듯한 거대한 수(水) 기운을 지녔습니다",
+    challenge: "감정의 폭이 크고 우울에 빠지기 쉬우나",
+    reward: "깊은 감수성과 재물운을 동시에 가진 구조입니다"
+  },
+  
+  // 목(木) 부족 (무관) - 5개
+  "목부족_무관_1": {
+    description: "목(木) 기운인 관성이 없어 넘치는 물을 제어해줄 나무가 부족한 상황입니다",
+    challenge: "자유분방하면서도 한편으로는 중심을 잡으려 애쓰는 모습이 나타납니다"
+  },
+  "목부족_무관_2": {
+    description: "나를 얽매는 틀이 전혀 보이지 않습니다",
+    challenge: "방향성 없이 표류할 위험이 있지만, 누구의 간섭도 받지 않는 자유를 누립니다"
+  },
+  "목부족_무관_3": {
+    description: "규율과 틀을 상징하는 목(木)이 사주에 없습니다",
+    challenge: "조직 생활이나 규칙에 답답함을 느끼지만, 독창적인 길을 개척할 수 있습니다"
+  },
+  "목부족_무관_4": {
+    description: "관성(官星)이 전무하여 상명하복의 구조를 거부합니다",
+    challenge: "체계적인 계획이 약하지만, 본능적인 판단력이 뛰어납니다"
+  },
+  "목부족_무관_5": {
+    description: "나무 한 그루 없는 평야처럼 관성이 부재합니다",
+    challenge: "자아가 강하지만 고집불통으로 비칠 수 있으니, 스스로 기준을 세우는 연습이 필요합니다"
+  },
+  
+  // 화(火) 과다 - 3개
+  "화과다_1": {
+    description: "뜨거운 불기운이 사주를 뒤덮고 있습니다",
+    challenge: "성급하고 조급한 성향이 나타나지만",
+    reward: "폭발적인 추진력으로 단기간에 큰 성과를 냅니다"
+  },
+  "화과다_2": {
+    description: "활활 타오르는 화염처럼 {개수}개의 화(火) 기운이 충만합니다",
+    challenge: "감정이 격하고 충동적일 수 있으나",
+    reward: "열정과 카리스마로 사람들을 이끄는 리더십이 있습니다"
+  },
+  "화과다_3": {
+    description: "태양처럼 빛나는 화(火) 에너지를 품었습니다",
+    challenge: "과도한 열정이 탈진으로 이어질 수 있지만",
+    reward: "창의력과 표현력이 남다릅니다"
+  },
+  
+  // 토(土) 과다 - 3개
+  "토과다_1": {
+    description: "토(土) 기운이 비견과 겁재로 작용하여 당신을 지탱해주고 있습니다",
+    challenge: "고집이 세고 융통성이 부족할 수 있지만",
+    reward: "흔들림 없는 중심축을 가진 인물입니다"
+  },
+  "토과다_2": {
+    description: "산처럼 쌓인 {개수}개의 토(土) 기운을 보유했습니다",
+    challenge: "느리고 답답해 보일 수 있으나",
+    reward: "신뢰와 안정성으로 사람들의 중심이 됩니다"
+  },
+  "토과다_3": {
+    description: "대지처럼 든든한 토(土) 에너지가 가득합니다",
+    challenge: "변화를 싫어하고 보수적일 수 있지만",
+    reward: "끝까지 책임을 다하는 믿음직스러움이 있습니다"
+  },
+  
+  // 금(金) 과다 - 3개
+  "금과다_1": {
+    description: "날카로운 금(金) 기운이 사방을 둘러싸고 있습니다",
+    challenge: "냉정하고 차가워 보일 수 있지만",
+    reward: "정확한 판단력과 결단력이 뛰어납니다"
+  },
+  "금과다_2": {
+    description: "쇠처럼 단단한 {개수}개의 금(金) 기운을 지녔습니다",
+    challenge: "융통성 없고 원칙적일 수 있으나",
+    reward: "흔들리지 않는 신념과 완벽주의가 강점입니다"
+  },
+  "금과다_3": {
+    description: "칼날처럼 예리한 금(金) 에너지가 충만합니다",
+    challenge: "비판적이고 날카로워 보이지만",
+    reward: "논리와 분석력으로 문제를 정확히 해결합니다"
+  },
+  
+  // 목(木) 과다 - 2개
+  "목과다_1": {
+    description: "울창한 숲처럼 {개수}개의 목(木) 기운이 가득합니다",
+    challenge: "고집이 세고 융통성이 부족하지만",
+    reward: "성장 욕구와 확장성이 뛰어납니다"
+  },
+  "목과다_2": {
+    description: "나무가 빽빽한 정글 같은 목(木) 에너지를 품었습니다",
+    challenge: "경쟁심이 강하고 신경질적일 수 있으나",
+    reward: "끈질긴 생명력과 인내심이 탁월합니다"
+  },
+  
+  // 재다신약 - 2개
+  "재다신약_1": {
+    description: "재성(물)이 과다하여 '재다신약'의 기운이 감돕니다",
+    challenge: "물이 많아 흙이 쓸려내려갈까 걱정되지만",
+    strength: "일지의 {일지}가 든든한 제방 역할을 해주고 있어 위기를 기회로 바꾸는 능력이 탁월합니다"
+  },
+  "재다신약_2": {
+    description: "재물과 기회가 넘쳐나지만 감당하기 벅찬 구조입니다",
+    challenge: "돈이 들어와도 새어나가기 쉽지만",
+    strength: "이를 단단히 잡아둘 그릇을 키우면 거부가 될 수 있습니다"
+  },
+  
+  // 재약신강 - 2개
+  "재약신강": {
+    description: "능력은 충분하지만 재성이 약하여",
+    challenge: "기회가 많지 않을 수 있으나",
+    strength: "한 번 잡은 기회는 절대 놓치지 않습니다"
+  },
+  "재약신강_2": {
+    description: "힘은 강하지만 재물 기회가 제한적입니다",
+    challenge: "벌이가 적을 수 있으나",
+    strength: "적극적으로 나서면 큰 성공을 거둘 수 있습니다"
+  },
+  
+  // 관왕신약 - 2개
+  "관왕신약": {
+    description: "관성이 과다하여 책임과 압박이 큽니다",
+    challenge: "스트레스를 많이 받고 피로하지만",
+    strength: "인정받고 리더가 될 그릇을 타고났습니다"
+  },
+  "관왕신약_2": {
+    description: "관성의 무게가 어깨를 짓누릅니다",
+    challenge: "부담감이 크고 쉽게 지치지만",
+    strength: "이를 극복하면 큰 권위를 얻게 됩니다"
+  },
+  
+  // 비겁과다 - 2개
+  "비겁과다": {
+    description: "비견과 겁재가 {개수}개로 강력합니다",
+    challenge: "자존심이 세고 경쟁심이 강하지만",
+    strength: "독립적이고 자수성가할 가능성이 높습니다"
+  },
+  "비겁과다_2": {
+    description: "형제처럼 나를 돕는 기운이 많습니다",
+    challenge: "동업이나 금전 거래는 조심해야 하지만",
+    strength: "혼자 힘으로 길을 개척하는 능력이 탁월합니다"
+  }
+};
+
+📦 7. SINSAL_MYEONGRI_INTERPRETATION (20개)
+const SINSAL_MYEONGRI_INTERPRETATION = {
+  "원진살": {
+    cause: "{위치} 사이에 '{원진명}'이 끼어 있어",
+    effect: "예민함과 직관력이 동시에 발달했습니다",
+    detail: "애증의 감정이 공존하며 변덕스러울 수 있으나, 남들이 못 보는 것을 캐치하는 천재성이 있습니다"
+  },
+  "귀문관살": {
+    cause: "{위치}에서 '귀문관살'의 영향을 강하게 받습니다",
+    effect: "예민한 감각과 직관력이 발달했습니다",
+    detail: "뜨거운 열기와 차가운 냉기가 충돌하며 만들어내는 예민한 감각을 의미하며, 남들이 보지 못하는 것을 캐치하는 천재성과 신경질적인 면모를 동시에 부여합니다"
+  },
+  "충": {
+    cause: "{위치} 사이에서 충(沖)이 발생하여",
+    effect: "삶의 변동성이 큽니다",
+    detail: "한곳에 머물지 못하고 끊임없이 움직이는 역마 기질이 있으며, 갑작스러운 변화와 이동이 잦습니다"
+  },
+  "형": {
+    cause: "{위치}에 형(刑)이 작용하여",
+    effect: "내적 갈등과 자기 처벌 경향이 있습니다",
+    detail: "자책하거나 스스로를 몰아붙이는 성향이 있으나, 이를 극복하면 강한 정신력을 얻게 됩니다"
+  },
+  "해": {
+    cause: "{위치}에서 해(害)가 발생하여",
+    effect: "은밀한 갈등과 서운함이 쌓입니다",
+    detail: "겉으로 드러나지 않지만 속으로 상처받기 쉬우며, 소통을 명확히 해야 오해를 풀 수 있습니다"
+  },
+  "천을귀인": {
+    cause: "천을귀인이 {위치}에 자리하고 있어",
+    effect: "위기의 순간마다 귀인이 나타납니다",
+    detail: "어려운 상황에서도 누군가의 도움을 받아 극복하는 복을 타고났으며, 위기를 기회로 바꾸는 운이 강합니다"
+  },
+  "태극귀인": {
+    cause: "태극귀인이 {위치}에 위치하여",
+    effect: "조상의 덕과 보호를 받습니다",
+    detail: "전생의 공덕이나 조상의 음덕으로 보이지 않는 보호막이 있으며, 절체절명의 위기에서도 살아남는 생명력이 있습니다"
+  },
+  "문창귀인": {
+    cause: "문창귀인이 {위치}에 있어",
+    effect: "학문과 문서운이 강합니다",
+    detail: "공부, 시험, 자격증에 강하며 글쓰기나 기획 능력이 뛰어나 지적인 분야에서 성공할 가능성이 높습니다"
+  },
+  "학당귀인": {
+    cause: "학당귀인이 {위치}에 자리하여",
+    effect: "배움에 대한 욕구가 강합니다",
+    detail: "평생 학습하는 자세를 가지며, 교육이나 연구 분야에서 두각을 나타낼 수 있습니다"
+  },
+  "복성귀인": {
+    cause: "복성귀인이 {위치}에 위치하여",
+    effect: "복과 행운이 따릅니다",
+    detail: "물질적 풍요와 정신적 만족을 동시에 누릴 수 있는 복을 타고났으며, 삶이 비교적 순탄합니다"
+  },
+  "도화살": {
+    cause: "도화살이 {위치}에 있어",
+    effect: "이성에게 인기가 많고 사교적입니다",
+    detail: "화려한 매력을 지녔지만, 유혹과 충동을 조심해야 하며 이성 관계에서 시행착오를 겪을 수 있습니다"
+  },
+  "홍염살": {
+    cause: "홍염살이 {위치}에 자리하여",
+    effect: "뜨거운 매력으로 사람들을 끌어당깁니다",
+    detail: "이성을 홀리는 강력한 카리스마가 있으나, 관계가 급격히 타올랐다 식는 경향이 있어 신중함이 필요합니다"
+  },
+  "역마살": {
+    cause: "역마살이 {위치}에 있어",
+    effect: "이동과 변화가 잦습니다",
+    detail: "한곳에 정착하기 어렵고 여행, 이사, 이직이 많으며 해외와 인연이 깊거나 역동적인 직업이 잘 맞습니다"
+  },
+  "화개살": {
+    cause: "화개살이 {위치}에 위치하여",
+    effect: "예술적 재능과 영적 감수성이 뛰어납니다",
+    detail: "고독을 즐기고 철학적 사색을 좋아하며, 창작이나 종교, 심리 분야에 소질이 있습니다"
+  },
+  "현침살": {
+    cause: "현침살이 {위치}에 자리하여",
+    effect: "섬세하고 정밀한 재능이 있습니다",
+    detail: "의료, 미용, 금융, IT 등 디테일이 중요한 분야에서 뛰어난 능력을 발휘하며 꼼꼼한 성향이 강합니다"
+  },
+  "백호살": {
+    cause: "백호살이 {위치}에 있어",
+    effect: "날카롭고 공격적인 기운이 있습니다",
+    detail: "승부욕이 강하고 경쟁에서 이기려는 성향이 있으나, 지나치면 적을 만들 수 있으니 조심해야 합니다"
+  },
+  "양인살": {
+    cause: "양인살이 {위치}에 위치하여",
+    effect: "극단적이고 파괴적인 에너지를 품었습니다",
+    detail: "강력한 추진력과 결단력이 있지만, 충동적이고 폭력적일 수 있어 감정 조절이 필요합니다"
+  },
+  "공망": {
+    cause: "{위치}에 공망이 들어",
+    effect: "텅 빈 듯한 허무함을 느낍니다",
+    detail: "물질보다 정신적 가치를 추구하며, 종교나 철학에 관심이 많고 속세를 벗어나고 싶어 하는 경향이 있습니다"
+  },
+  "천덕귀인": {
+    cause: "천덕귀인이 {위치}에 자리하여",
+    effect: "하늘의 덕을 받습니다",
+    detail: "선한 영향력을 끼치고 남을 돕는 일에 보람을 느끼며, 덕을 쌓으면 복이 배가 되는 구조입니다"
+  },
+  "월덕귀인": {
+    cause: "월덕귀인이 {위치}에 위치하여",
+    effect: "달의 은혜를 받습니다",
+    detail: "부드럽고 온화한 기운으로 사람들에게 사랑받으며, 여성과의 인연이나 모성적 보살핌을 받는 복이 있습니다"
+  }
+};
+
+📦 8. ILGAN_TONGGEUN (10개)
+const ILGAN_TONGGEUN = {
+  "토_토": {
+    description: "일간 {일간}이 지지의 {일지}에 뿌리를 내리고 있어",
+    strength: "자립심이 강하고 독립적입니다",
+    metaphor: "땅에 단단히 뿌리내린 나무처럼 흔들리지 않습니다"
+  },
+  "목_목": {
+    description: "일간 {일간}이 지지에 뿌리를 확실히 내렸습니다",
+    strength: "생명력이 왕성하고 성장 욕구가 강합니다",
+    metaphor: "옥토에 심어진 씨앗처럼 무럭무럭 자랍니다"
+  },
+  "화_화": {
+    description: "일간 {일간}이 지지의 화 기운을 받아",
+    strength: "에너지가 넘치고 열정적입니다",
+    metaphor: "불길이 장작을 만나 더욱 활활 타오릅니다"
+  },
+  "금_금": {
+    description: "일간 {일간}이 지지에 단단히 뿌리내려",
+    strength: "원칙과 신념이 확고합니다",
+    metaphor: "쇠가 쇠를 만나 더욱 단단해집니다"
+  },
+  "수_수": {
+    description: "일간 {일간}이 지지의 물 기운을 받아",
+    strength: "유연하고 적응력이 뛰어납니다",
+    metaphor: "물이 물을 만나 흐름이 더욱 커집니다"
+  },
+  "목_토": {
+    description: "일간 {일간}이 흙 속에 뿌리를 내렸으나",
+    strength: "안정감은 있지만 성장이 제한될 수 있습니다",
+    metaphor: "화분 속 나무처럼 틀 안에서 자랍니다"
+  },
+  "화_금": {
+    description: "일간 {일간}이 금 기운을 만나",
+    strength: "단련되며 강해지지만 충돌도 있습니다",
+    metaphor: "불이 쇠를 만나 검을 벼립니다"
+  },
+  "토_수": {
+    description: "일간 {일간}이 물 위에 떠있어",
+    strength: "불안정하지만 유연하게 적응합니다",
+    metaphor: "강물에 휩쓸리는 흙처럼 변동성이 큽니다"
+  },
+  "금_목": {
+    description: "일간 {일간}이 나무를 베는 형상이라",
+    strength: "날카롭고 결단력이 있지만 파괴적일 수 있습니다",
+    metaphor: "도끼가 나무를 베듯 강력하지만 거칠습니다"
+  },
+  "수_화": {
+    description: "일간 {일간}이 불을 만나",
+    strength: "대립하지만 균형을 이루면 강력합니다",
+    metaphor: "물과 불이 만나 수증기가 되듯 변화무쌍합니다"
+  }
+};
+
+📦 9. PRACTICAL_ADVICE (190개)
+
+const PRACTICAL_ADVICE = {
+  
+  // ========================================
+  // 1. 오행 과다/부족 패턴 (50개)
+  // ========================================
+  
+  // 수(水) 과다 - 10개
+  "수과다_갑목": {
+    core: "넘치는 물을 흡수하여 성장의 자양분으로 삼으세요",
+    detail: "물이 많아 뿌리가 썩을까 걱정되지만, 갑목은 큰 나무라 감당할 수 있습니다",
+    positive: "물은 당신을 키우는 원천이며 끝없는 성장 가능성입니다",
+    action: "다만 지나친 물은 배수가 필요하니, 목표를 명확히 세워 에너지를 집중하세요",
+    result: "방향만 잡으면 거목으로 자랄 수 있습니다"
+  },
+  "수과다_을목": {
+    core: "물결에 휩쓸리지 말고 유연하게 흐름을 타세요",
+    detail: "을목은 덩굴이라 물이 많으면 방향을 잃기 쉽습니다",
+    positive: "하지만 유연함이 강점이니, 물을 따라 자라되 뿌리는 단단히 내리세요",
+    action: "핵심 가치 하나만은 흔들리지 않게 지키세요",
+    result: "유연함과 중심의 균형이 성공의 열쇠입니다"
+  },
+  "수과다_병화": {
+    core: "물과 불의 대립을 조화로 바꾸는 것이 핵심입니다",
+    detail: "물이 불을 끄려 하지만, 적당하면 수증기가 되어 더 큰 에너지를 만듭니다",
+    positive: "감정과 이성의 균형을 맞추면 폭발적인 창의력이 나옵니다",
+    action: "감정에 휩쓸리지 말고, 열정을 지속 가능한 형태로 관리하세요",
+    result: "물과 불의 조화가 당신의 무기입니다"
+  },
+  "수과다_정화": {
+    core: "꺼질 듯 말 듯한 불씨를 지키는 것이 관건입니다",
+    detail: "정화는 작은 불이라 물이 많으면 꺼지기 쉽습니다",
+    positive: "하지만 물 위를 떠다니는 등불처럼 흔들려도 꺼지지 않는 신념이 있습니다",
+    action: "자신만의 안전지대를 확보하고, 에너지를 아껴 쓰세요",
+    result: "작지만 꺼지지 않는 빛이 당신의 힘입니다"
+  },
+  "수과다_무토": {
+    core: "거대한 물을 막아서는 댐이 되세요",
+    detail: "무토는 큰 산이라 물을 제어할 힘이 있습니다",
+    positive: "물이 많다는 건 당신이 관리할 재물과 기회가 많다는 뜻입니다",
+    action: "시스템과 구조를 만들어 흐르는 물을 가두고 활용하세요",
+    result: "물을 다스리는 자가 왕이 됩니다"
+  },
+  "수과다_기토": {
+    core: "감정의 파도에 휩쓸리지 않는 것이 개운의 핵심입니다",
+    detail: "주변 상황이나 타인의 말에 예민하게 반응하기보다는, 본인만의 '마이웨이'를 뚝심 있게 밀고 나가세요",
+    positive: "물이 많다는 건 유연함이자 재물입니다",
+    action: "다만 이 물을 가둘 튼튼한 댐을 쌓기 위해 자기계발이나 자격증 취득 등 본인의 스펙을 단단하게 만드는 과정이 반드시 필요합니다",
+    result: "그래야 들어오는 돈과 기회를 모두 내 것으로 만들 수 있습니다"
+  },
+  "수과다_경금": {
+    core: "녹슬지 않도록 스스로를 단련하세요",
+    detail: "물이 많으면 쇠가 녹슬 수 있지만, 경금은 단단한 철이라 견딜 수 있습니다",
+    positive: "물은 당신을 깨끗이 씻어주고 날카롭게 벼려줍니다",
+    action: "원칙을 지키되, 때로는 유연함도 필요합니다",
+    result: "강철 같은 신념과 물 같은 유연함의 조화가 성공을 만듭니다"
+  },
+  "수과다_신금": {
+    core: "물에 씻겨 더욱 빛나는 보석이 되세요",
+    detail: "신금은 귀금속이라 물이 많아도 녹슬지 않습니다",
+    positive: "오히려 물이 때를 씻어내 본래의 빛을 드러냅니다",
+    action: "자신의 가치를 믿고, 외부 평가에 흔들리지 마세요",
+    result: "진주는 물속에서 더 빛납니다"
+  },
+  "수과다_임수": {
+    core: "물이 물을 만나 바다가 되는 것을 두려워하지 마세요",
+    detail: "임수는 큰 물이라 더 많은 물을 감당할 수 있습니다",
+    positive: "거대한 스케일과 깊은 감수성이 당신의 무기입니다",
+    action: "다만 방향을 잃지 않도록 목표를 명확히 하세요",
+    result: "바다처럼 모든 것을 품을 수 있는 그릇입니다"
+  },
+  "수과다_계수": {
+    core: "흩어지지 않도록 중심을 잡으세요",
+    detail: "계수는 작은 물이라 많은 물에 섞이면 정체성을 잃기 쉽습니다",
+    positive: "하지만 섬세함과 침투력은 누구보다 강합니다",
+    action: "자신만의 색깔을 지키며, 조용히 영향력을 퍼뜨리세요",
+    result: "이슬방울처럼 작아도 스며드는 힘이 있습니다"
+  },
+  
+  // 목(木) 부족 (무관) - 10개
+  "목부족_갑목": {
+    core: "나무가 나무를 필요로 하지 않듯, 홀로 서는 법을 배우세요",
+    detail: "갑목이 관성이 없다는 건 독립적이라는 뜻입니다",
+    positive: "누구의 간섭도 받지 않는 자유로운 영혼입니다",
+    action: "스스로 규칙을 만들고 지키는 자율성이 필요합니다",
+    result: "홀로 우뚝 선 거목이 당신의 미래입니다"
+  },
+  "목부족_을목": {
+    core: "덩굴이 기댈 나무가 없다면, 땅에 뿌리내리세요",
+    detail: "을목에게 관성이 없으면 방향을 잃기 쉽습니다",
+    positive: "하지만 어디든 휘감아 자라는 적응력이 있습니다",
+    action: "목표를 스스로 세우고, 그것을 향해 나아가세요",
+    result: "기댈 곳이 없어도 스스로 길을 만듭니다"
+  },
+  "목부족_병화": {
+    core: "태울 나무가 없다면, 스스로 빛을 내세요",
+    detail: "병화는 큰 불이라 나무 없이도 타오를 수 있습니다",
+    positive: "규칙과 틀 없이도 스스로 길을 밝힙니다",
+    action: "다만 방향성을 잃지 않도록 목표를 명확히 하세요",
+    result: "태양은 홀로 빛나도 충분합니다"
+  },
+  "목부족_정화": {
+    core: "작은 불씨도 나무 없이 타오를 수 있습니다",
+    detail: "정화에게 관성이 없으면 외롭지만 독립적입니다",
+    positive: "섬세한 관찰력으로 스스로 길을 찾습니다",
+    action: "자기만의 기준을 세우고, 그것을 꾸준히 지키세요",
+    result: "작지만 꺼지지 않는 빛이 길을 밝힙니다"
+  },
+  "목부족_무토": {
+    core: "산은 나무 없이도 우뚝 섭니다",
+    detail: "무토는 큰 땅이라 관성 없이도 자립할 수 있습니다",
+    positive: "누구의 간섭도 받지 않는 강력한 독립성",
+    action: "스스로 목표를 세우고, 흔들림 없이 밀고 나가세요",
+    result: "홀로 서는 산처럼 당당합니다"
+  },
+  "목부족_기토": {
+    core: "주변의 흐름에 몸을 맡기기보다는 나만의 확실한 '뚝'을 쌓는다는 마음으로 기준을 세우세요",
+    detail: "관성이 없어 자유롭지만, 그만큼 스스로 방향을 잡아야 합니다",
+    positive: "능력은 차고 넘치지만, 휩쓸리지 않으려면 멘탈 관리가 필수입니다",
+    action: "흐르는 물을 가두어 농업 용수로 쓴다면",
+    result: "거부가 될 그릇입니다"
+  },
+  "목부족_경금": {
+    core: "벨 나무가 없다면, 스스로 날을 세우세요",
+    detail: "경금은 날카로운 금속이라 나무 없이도 쓰임새가 있습니다",
+    positive: "규율 없이도 스스로를 단련하는 힘이 있습니다",
+    action: "자기 관리와 원칙을 스스로 만드세요",
+    result: "스스로 벼려진 검이 가장 날카롭습니다"
+  },
+  "목부족_신금": {
+    core: "보석은 나무 없이도 빛납니다",
+    detail: "신금에게 관성이 없으면 자유롭지만 방향을 잃기 쉽습니다",
+    positive: "하지만 본연의 가치는 변하지 않습니다",
+    action: "자신의 진가를 알아보는 사람을 찾으세요",
+    result: "진짜 보석은 어디서든 빛납니다"
+  },
+  "목부족_임수": {
+    core: "강물은 나무 없이도 흐릅니다",
+    detail: "임수는 큰 물이라 관성 없이도 방향을 찾습니다",
+    positive: "자유롭게 흐르며 길을 만드는 개척자입니다",
+    action: "다만 범람하지 않도록 스스로 제어하세요",
+    result: "물은 스스로 길을 찾습니다"
+  },
+  "목부족_계수": {
+    core: "이슬은 나무 없이도 맺힙니다",
+    detail: "계수에게 관성이 없으면 외롭지만 자유롭습니다",
+    positive: "조용히 스며드는 힘이 있습니다",
+    action: "자신만의 방식으로 영향력을 펼치세요",
+    result: "작지만 스며드는 힘이 가장 강합니다"
+  },
+  
+  // 화(火) 과다 - 10개
+  "화과다_갑목": {
+    core: "불에 타지 않도록 거리를 조절하세요",
+    detail: "갑목은 큰 나무라 불이 많으면 타버릴 수 있습니다",
+    positive: "하지만 적당한 열은 성장을 돕습니다",
+    action: "열정은 좋지만, 탈진하지 않도록 페이스 조절이 필요합니다",
+    result: "타지 않고 따뜻함을 유지하는 것이 지혜입니다"
+  },
+  "화과다_을목": {
+    core: "작은 불씨에도 쉽게 타오르니 조심하세요",
+    detail: "을목은 작은 나무라 불에 약합니다",
+    positive: "하지만 재빨리 반응하는 민첩함이 있습니다",
+    action: "감정 조절과 템포 관리가 필수입니다",
+    result: "타오르되 타버리지 않는 균형이 중요합니다"
+  },
+  "화과다_병화": {
+    core: "템포를 늦추고 한 템포 쉬어가는 연습이 필요합니다",
+    detail: "불처럼 빠르게 타오르지만 쉽게 지치기도 합니다",
+    positive: "열정은 장점이지만, 지속력을 키워야 합니다",
+    action: "명상이나 호흡 훈련으로 마음을 가라앉히세요",
+    result: "급할수록 돌아가라는 말을 명심하면 더 큰 성과를 얻습니다"
+  },
+  "화과다_정화": {
+    core: "과열되지 않도록 스스로를 식히세요",
+    detail: "정화는 작은 불이지만 많으면 탈진합니다",
+    positive: "섬세한 열정은 당신의 강점입니다",
+    action: "휴식과 재충전의 시간을 반드시 가지세요",
+    result: "꺼지지 않고 오래 타오르는 것이 진짜 힘입니다"
+  },
+  "화과다_무토": {
+    core: "뜨거움을 품고 단단해지세요",
+    detail: "무토는 불을 만나 더 단단해집니다",
+    positive: "열정과 안정성을 동시에 가진 구조입니다",
+    action: "에너지를 잘 관리하면 큰 성과를 냅니다",
+    result: "뜨거운 땅은 황금을 품습니다"
+  },
+  "화과다_기토": {
+    core: "말라 갈라지지 않도록 수분을 보충하세요",
+    detail: "기토는 작은 흙이라 불이 많으면 건조해집니다",
+    positive: "하지만 뜨거운 열정은 강력한 추진력이 됩니다",
+    action: "감정 기복을 조절하고, 휴식을 취하세요",
+    result: "적당한 온기가 생명을 키웁니다"
+  },
+  "화과다_경금": {
+    core: "녹아내리지 않도록 거리를 두세요",
+    detail: "경금은 불에 녹을 수 있지만, 단련되기도 합니다",
+    positive: "시련은 당신을 더 강하게 만듭니다",
+    action: "열정을 받아들이되, 자신을 잃지 마세요",
+    result: "불에 단련된 검이 가장 날카롭습니다"
+  },
+  "화과다_신금": {
+    core: "녹지 않도록 자신을 지키세요",
+    detail: "신금은 귀금속이라 불에 약합니다",
+    positive: "하지만 정제되면 더 순수해집니다",
+    action: "감정에 휩쓸리지 말고, 냉정함을 유지하세요",
+    result: "순도 높은 금은 불을 견딥니다"
+  },
+  "화과다_임수": {
+    core: "증발하지 않도록 깊이를 유지하세요",
+    detail: "임수는 큰 물이지만 불이 많으면 마릅니다",
+    positive: "하지만 수증기가 되어 더 큰 에너지를 만들 수 있습니다",
+    action: "열정과 냉정의 균형을 맞추세요",
+    result: "물과 불의 조화가 최고의 힘입니다"
+  },
+  "화과다_계수": {
+    core: "말라 없어지지 않도록 자신을 보호하세요",
+    detail: "계수는 작은 물이라 불에 취약합니다",
+    positive: "하지만 작은 물방울도 불을 끌 수 있습니다",
+    action: "자신의 한계를 알고, 무리하지 마세요",
+    result: "작아도 꾸준함이 이깁니다"
+  },
+  
+  // 토(土) 과다 - 10개
+  "토과다_갑목": {
+    core: "흙에 묻히지 않도록 하늘을 향해 뻗으세요",
+    detail: "갑목은 큰 나무지만 흙이 많으면 숨 막힙니다",
+    positive: "하지만 뿌리는 더 단단해집니다",
+    action: "답답함을 느끼면 환경을 바꾸세요",
+    result: "흙을 뚫고 나온 나무가 가장 강합니다"
+  },
+  "토과다_을목": {
+    core: "무거운 흙을 뚫고 나가는 힘을 키우세요",
+    detail: "을목은 작은 나무라 흙이 많으면 자라기 어렵습니다",
+    positive: "하지만 끈질긴 생명력이 있습니다",
+    action: "포기하지 말고 꾸준히 나아가세요",
+    result: "바위틈의 풀이 가장 강합니다"
+  },
+  "토과다_병화": {
+    core: "흙에 묻혀 꺼지지 않도록 빛을 내세요",
+    detail: "병화는 큰 불이지만 흙이 많으면 산소가 부족합니다",
+    positive: "하지만 안정된 기반을 가질 수 있습니다",
+    action: "답답함을 느끼면 새로운 공간을 찾으세요",
+    result: "흙 속에서도 빛은 샙니다"
+  },
+  "토과다_정화": {
+    core: "흙에 가려지지 않도록 자신을 드러내세요",
+    detail: "정화는 작은 불이라 흙이 많으면 보이지 않습니다",
+    positive: "하지만 은은한 빛은 더 깊이 스며듭니다",
+    action: "자신의 가치를 적극적으로 알리세요",
+    result: "작아도 빛나는 것이 중요합니다"
+  },
+  "토과다_무토": {
+    core: "융통성을 키우고 변화를 받아들이는 연습이 필요합니다",
+    detail: "산처럼 든든하지만, 때로는 유연함도 힘입니다",
+    positive: "신뢰와 안정성은 당신의 최고 자산입니다",
+    action: "새로운 시도를 두려워하지 말고, 작은 변화부터 실험해보세요",
+    result: "변화를 받아들이면 더 큰 성장이 기다립니다"
+  },
+  "토과다_기토": {
+    core: "흙이 흙을 만나 산을 이루되, 무너지지 않게 하세요",
+    detail: "기토에게 토가 많으면 무겁고 느립니다",
+    positive: "하지만 흔들리지 않는 안정성이 있습니다",
+    action: "가벼움과 민첩함을 연습하세요",
+    result: "무거워도 단단함은 힘입니다"
+  },
+  "토과다_경금": {
+    core: "흙 속에 묻힌 금맥을 드러내세요",
+    detail: "경금은 흙이 많으면 숨겨집니다",
+    positive: "하지만 발견되면 엄청난 가치가 있습니다",
+    action: "자신을 적극적으로 알리고, 기회를 찾으세요",
+    result: "숨겨진 보물이 가장 귀합니다"
+  },
+  "토과다_신금": {
+    core: "흙을 닦아내고 빛을 내세요",
+    detail: "신금은 귀금속이지만 흙이 많으면 가려집니다",
+    positive: "하지만 본질은 변하지 않습니다",
+    action: "자기 PR과 네트워킹에 신경 쓰세요",
+    result: "보석은 닦으면 빛납니다"
+  },
+  "토과다_임수": {
+    core: "흙탕물이 되지 않도록 맑음을 유지하세요",
+    detail: "임수는 큰 물이지만 흙이 많으면 탁해집니다",
+    positive: "하지만 흙을 가라앉히는 힘이 있습니다",
+    action: "중심을 잡고, 혼란에 흔들리지 마세요",
+    result: "맑은 물이 가장 깊습니다"
+  },
+  "토과다_계수": {
+    core: "진흙에 묻히지 않도록 순수함을 지키세요",
+    detail: "계수는 작은 물이라 흙에 섞이면 사라집니다",
+    positive: "하지만 스며드는 힘은 여전합니다",
+    action: "자신만의 색깔을 잃지 마세요",
+    result: "작아도 순수함이 힘입니다"
+  },
+  
+  // 금(金) 과다 - 10개
+  "금과다_갑목": {
+    core: "베어지지 않도록 유연함을 키우세요",
+    detail: "갑목은 큰 나무지만 금이 많으면 베어집니다",
+    positive: "하지만 시련은 당신을 강하게 만듭니다",
+    action: "정면 대결보다는 우회하는 지혜가 필요합니다",
+    result: "휘어져도 부러지지 않는 것이 진짜 강함입니다"
+  },
+  "금과다_을목": {
+    core: "잘리지 않도록 몸을 낮추세요",
+    detail: "을목은 작은 나무라 금에 약합니다",
+    positive: "하지만 덩굴처럼 피해 갈 수 있습니다",
+    action: "정면 승부보다는 전략적으로 접근하세요",
+    result: "살아남는 것이 이기는 것입니다"
+  },
+  "금과다_병화": {
+    core: "쇠를 녹이는 뜨거움을 유지하세요",
+    detail: "병화는 큰 불이라 금을 다룰 수 있습니다",
+    positive: "시련을 기회로 바꾸는 힘이 있습니다",
+    action: "어려움을 두려워하지 말고 정면 돌파하세요",
+    result: "불은 쇠를 제련합니다"
+  },
+  "금과다_정화": {
+    core: "쇠를 세밀하게 다듬는 장인이 되세요",
+    detail: "정화는 작은 불이지만 보석을 깎을 수 있습니다",
+    positive: "섬세함이 당신의 무기입니다",
+    action: "디테일에 집중하고, 완벽을 추구하세요",
+    result: "세공이 보석의 가치를 결정합니다"
+  },
+  "금과다_무토": {
+    core: "금을 품고 가치를 높이세요",
+    detail: "무토는 큰 땅이라 금을 품을 수 있습니다",
+    positive: "금맥을 품은 산은 보물입니다",
+    action: "자신 안의 가치를 발견하고 키우세요",
+    result: "금을 품은 땅이 부자입니다"
+  },
+  "금과다_기토": {
+    core: "금을 키우고 빛내세요",
+    detail: "기토는 작은 흙이지만 금을 자라게 합니다",
+    positive: "숨겨진 재능을 드러낼 힘이 있습니다",
+    action: "자신과 타인의 장점을 발견하고 키우세요",
+    result: "금을 키우는 자가 부자입니다"
+  },
+  "금과다_경금": {
+    core: "따뜻함을 표현하고 감정을 드러내는 연습이 필요합니다",
+    detail: "칼처럼 예리하지만, 날카로움만으로는 사람을 얻을 수 없습니다",
+    positive: "정확한 판단력은 당신의 강점입니다",
+    action: "가끔은 논리보다 감정에 귀 기울여보세요",
+    result: "차가움과 따뜻함의 균형을 찾으면 진정한 리더가 됩니다"
+  },
+  "금과다_신금": {
+    core: "지나친 완벽주의를 내려놓으세요",
+    detail: "신금이 많으면 너무 완벽해서 부러질 수 있습니다",
+    positive: "하지만 순수함은 당신의 자산입니다",
+    action: "실수를 허용하고, 불완전함을 받아들이세요",
+    result: "완벽보다 완성이 중요합니다"
+  },
+  "금과다_임수": {
+    core: "쇠를 씻어 맑은 물이 되세요",
+    detail: "임수는 금을 만나 더 맑아집니다",
+    positive: "정제되고 순수한 지혜를 가졌습니다",
+    action: "맑음을 유지하며 흐르세요",
+    result: "금에서 나온 물이 가장 맑습니다"
+  },
+  "금과다_계수": {
+    core: "작은 물방울도 쇠를 녹슬게 합니다",
+    detail: "계수는 작지만 금을 부드럽게 만듭니다",
+    positive: "은밀하게 영향력을 발휘하는 힘이 있습니다",
+    action: "조용히 스며들어 변화를 만드세요",
+    result: "작은 힘이 큰 것을 바꿉니다"
+  },
+  
+  // ========================================
+  // 2. 십성 조합별 (60개)
+  // ========================================
+  
+  // 재다신약 - 10개
+  "재다신약_갑목": {
+    core: "들어오는 재물을 감당할 그릇을 키우세요",
+    detail: "갑목은 큰 나무지만 재성이 많으면 버겁습니다",
+    positive: "기회는 많지만 체력 관리가 필요합니다",
+    action: "자기계발로 역량을 키우고, 선택과 집중을 하세요",
+    result: "그릇이 커지면 더 많이 담을 수 있습니다"
+  },
+  "재다신약_을목": {
+    core: "욕심을 줄이고 현실적인 목표를 세우세요",
+    detail: "을목은 작은 나무라 많은 재물을 감당하기 어렵습니다",
+    positive: "하지만 유연하게 기회를 잡을 수 있습니다",
+    action: "무리하지 말고, 하나씩 차근차근 쌓으세요",
+    result: "작지만 단단하게 모으는 것이 지혜입니다"
+  },
+  "재다신약_병화": {
+    core: "에너지를 분산하지 말고 집중하세요",
+    detail: "병화는 열정이 넘치지만 재물이 많으면 흩어집니다",
+    positive: "기회가 많은 것은 축복입니다",
+    action: "선택과 집중으로 에너지를 모으세요",
+    result: "집중된 불빛이 가장 밝습니다"
+  },
+  "재다신약_정화": {
+    core: "작은 불씨가 큰 장작을 태우려 하지 마세요",
+    detail: "정화는 작지만 재물이 많으면 부담됩니다",
+    positive: "섬세함으로 조금씩 다룰 수 있습니다",
+    action: "욕심내지 말고, 감당할 만큼만 가져가세요",
+    result: "작은 불도 꾸준히 타오르면 큰 일을 합니다"
+  },
+  "재다신약_무토": {
+    core: "큰 산도 감당할 수 없는 물이 있습니다",
+    detail: "무토는 크지만 재물이 너무 많으면 무너집니다",
+    positive: "하지만 제방을 쌓으면 댐이 됩니다",
+    action: "시스템과 구조를 만들어 재물을 관리하세요",
+    result: "물을 다스리는 자가 부자입니다"
+  },
+  "재다신약_기토": {
+    core: "감정의 파도에 휩쓸리지 않는 것이 개운의 핵심입니다",
+    detail: "주변 상황이나 타인의 말에 예민하게 반응하기보다는, 본인만의 '마이웨이'를 뚝심 있게 밀고 나가세요",
+    positive: "물이 많다는 건 유연함이자 재물입니다",
+    action: "다만 이 물을 가둘 튼튼한 댐을 쌓기 위해 자기계발이나 자격증 취득 등 본인의 스펙을 단단하게 만드는 과정이 반드시 필요합니다",
+    result: "그래야 들어오는 돈과 기회를 모두 내 것으로 만들 수 있습니다"
+  },
+  "재다신약_경금": {
+    core: "쇠도 너무 많은 물에는 녹슬니다",
+    detail: "경금은 단단하지만 재물이 많으면 버겁습니다",
+    positive: "하지만 원칙을 지키면 녹슬지 않습니다",
+    action: "재테크와 자산 관리를 체계적으로 하세요",
+    result: "원칙 있는 관리가 재물을 지킵니다"
+  },
+  "재다신약_신금": {
+    core: "보석도 물에 잠기면 보이지 않습니다",
+    detail: "신금은 귀하지만 재물이 많으면 가려집니다",
+    positive: "하지만 본질은 변하지 않습니다",
+    action: "자신의 가치를 지키며, 현명하게 선택하세요",
+    result: "진짜 가치는 시간이 증명합니다"
+  },
+  "재다신약_임수": {
+    core: "강물도 지류가 많으면 흩어집니다",
+    detail: "임수는 크지만 재물이 많으면 방향을 잃습니다",
+    positive: "하지만 큰 스케일은 당신의 무기입니다",
+    action: "목표를 명확히 하고, 선택과 집중을 하세요",
+    result: "한 방향으로 흐르는 물이 가장 강합니다"
+  },
+  "재다신약_계수": {
+    core: "이슬방울이 바다를 품을 수는 없습니다",
+    detail: "계수는 작아서 많은 재물을 감당하기 어렵습니다",
+    positive: "하지만 섬세하게 다룰 수 있습니다",
+    action: "욕심내지 말고, 현실적인 목표를 세우세요",
+    result: "작아도 꾸준히 모으면 큽니다"
+  },
+  
+  // 재약신강 - 10개
+  "재약신강_갑목": {
+    core: "적극적으로 나서서 기회를 만드세요",
+    detail: "갑목은 크지만 재물 기회가 적습니다",
+    positive: "능력은 충분하니 기회만 잡으면 됩니다",
+    action: "네트워킹과 마케팅에 신경 쓰세요",
+    result: "기회는 기다리는 것이 아니라 만드는 것입니다"
+  },
+  "재약신강_을목": {
+    core: "유연하게 기회를 찾아 나서세요",
+    detail: "을목은 작지만 적응력이 있습니다",
+    positive: "어디든 뿌리내릴 수 있습니다",
+    action: "다양한 분야에 도전해보세요",
+    result: "기회는 움직이는 자에게 옵니다"
+  },
+  "재약신강_병화": {
+    core: "빛을 내어 기회를 끌어당기세요",
+    detail: "병화는 밝지만 재물이 적습니다",
+    positive: "하지만 사람을 끌어당기는 힘이 있습니다",
+    action: "자신을 적극적으로 알리세요",
+    result: "빛나는 자에게 기회가 옵니다"
+  },
+  "재약신강_정화": {
+    core: "작은 빛도 어둠에서는 빛납니다",
+    detail: "정화는 작지만 재물이 적어도 괜찮습니다",
+    positive: "섬세함으로 기회를 만들 수 있습니다",
+    action: "디테일에 집중하고, 전문성을 키우세요",
+    result: "전문가에게 기회가 옵니다"
+  },
+  "재약신강_무토": {
+    core: "산이 금맥을 찾듯 기회를 발굴하세요",
+    detail: "무토는 크지만 재물이 숨어있습니다",
+    positive: "발굴하면 큰 보물이 있습니다",
+    action: "적극적으로 탐색하고 도전하세요",
+    result: "숨겨진 기회가 가장 큽니다"
+  },
+  "재약신강_기토": {
+    core: "작은 밭도 잘 가꾸면 풍성합니다",
+    detail: "기토는 작지만 재물을 키울 수 있습니다",
+    positive: "꾸준함이 당신의 무기입니다",
+    action: "작게 시작해서 꾸준히 키우세요",
+    result: "작은 밭이 큰 농장이 됩니다"
+  },
+  "재약신강_경금": {
+    core: "날카로움으로 기회를 만드세요",
+    detail: "경금은 강하지만 재물이 적습니다",
+    positive: "하지만 정확함으로 기회를 잡습니다",
+    action: "전문성과 차별화로 승부하세요",
+    result: "날카로운 검이 길을 엽니다"
+  },
+  "재약신강_신금": {
+    core: "보석은 희소해서 귀합니다",
+    detail: "신금은 고귀하지만 재물이 적습니다",
+    positive: "하지만 진가를 알아보는 사람이 있습니다",
+    action: "자신의 가치를 믿고, 적극적으로 알리세요",
+    result: "진짜 보석은 저절로 빛납니다"
+  },
+  "재약신강_임수": {
+    core: "깊은 바다도 작은 시작이 있었습니다",
+    detail: "임수는 크지만 재물이 적어도 괜찮습니다",
+    positive: "시간이 지나면 물은 모입니다",
+    action: "꾸준히 흐르며 기회를 모으세요",
+    result: "물은 낮은 곳으로 흐르며 모입니다"
+  },
+  "재약신강_계수": {
+    core: "작은 물방울도 모이면 바다가 됩니다",
+    detail: "계수는 작지만 재물을 모을 수 있습니다",
+    positive: "꾸준함이 당신의 힘입니다",
+    action: "작아도 멈추지 말고 계속 모으세요",
+    result: "티끌 모아 태산입니다"
+  },
+  
+// ========================================
+// 관왕신약 - 10개
+// ========================================
+"관왕신약_갑목": {
+  core: "책임의 무게를 나누는 법을 배우세요",
+  detail: "갑목은 크지만 관성이 많으면 짓눌립니다",
+  positive: "리더의 자질은 충분합니다",
+  action: "위임하고 협업하는 법을 익히세요",
+  result: "혼자 짊어지지 않아도 됩니다"
+},
+"관왕신약_을목": {
+  core: "큰 책임은 작은 나무를 꺾습니다",
+  detail: "을목은 작아서 관성이 많으면 버겁습니다",
+  positive: "하지만 유연하게 피할 수 있습니다",
+  action: "정면 승부보다는 전략적으로 대응하세요",
+  result: "휘어지되 부러지지 않으세요"
+},
+"관왕신약_병화": {
+  core: "꺼지지 않도록 에너지를 관리하세요",
+  detail: "병화는 밝지만 관성이 많으면 탈진합니다",
+  positive: "열정은 당신의 무기입니다",
+  action: "휴식과 재충전의 시간을 꼭 가지세요",
+  result: "오래 타오르는 불이 진짜 강합니다"
+},
+"관왕신약_정화": {
+  core: "작은 불씨를 지키는 것이 우선입니다",
+  detail: "정화는 작아서 책임이 많으면 꺼집니다",
+  positive: "섬세함은 당신의 강점입니다",
+  action: "무리하지 말고, 자신의 한계를 인정하세요",
+  result: "작아도 꺼지지 않는 것이 중요합니다"
+},
+"관왕신약_무토": {
+  core: "산도 무너질 때가 있습니다",
+  detail: "무토는 크지만 관성이 과하면 감당 못합니다",
+  positive: "하지만 회복력은 강합니다",
+  action: "쉬어가는 용기를 가지세요",
+  result: "무너지기 전에 멈추세요"
+},
+"관왕신약_기토": {
+  core: "작은 흙이 산을 떠받칠 수는 없습니다",
+  detail: "기토는 작아서 큰 책임을 감당하기 어렵습니다",
+  positive: "하지만 한 걸음씩 해낼 수 있습니다",
+  action: "우선순위를 정하고, 하나씩 처리하세요",
+  result: "천천히 가도 괜찮습니다"
+},
+"관왕신약_경금": {
+  core: "단단해도 부러질 수 있습니다",
+  detail: "경금은 강하지만 관성이 많으면 스트레스가 큽니다",
+  positive: "원칙을 지키는 힘이 있습니다",
+  action: "유연함도 때로는 필요합니다",
+  result: "휘어지는 것도 강함입니다"
+},
+"관왕신약_신금": {
+  core: "보석도 압력이 과하면 부서집니다",
+  detail: "신금은 귀하지만 관성이 많으면 힘듭니다",
+  positive: "고귀함을 지키려는 의지가 있습니다",
+  action: "자신을 보호하는 법을 배우세요",
+  result: "스스로를 지키는 것도 능력입니다"
+},
+"관왕신약_임수": {
+  core: "강물도 댐이 너무 많으면 막힙니다",
+  detail: "임수는 크지만 관성이 많으면 흐름이 막힙니다",
+  positive: "하지만 물은 결국 길을 찾습니다",
+  action: "막힌 곳을 우회하는 지혜가 필요합니다",
+  result: "물은 항상 길을 찾습니다"
+},
+"관왕신약_계수": {
+  core: "작은 물방울이 큰 돌을 떠받칠 수는 없습니다",
+  detail: "계수는 작아서 관성이 많으면 압도됩니다",
+  positive: "하지만 스며드는 힘은 있습니다",
+  action: "정면 대결보다는 조용히 침투하세요",
+  result: "작은 힘도 꾸준하면 강합니다"
+},
+
+// ========================================
+// 비겁과다 - 10개
+// ========================================
+"비겁과다_갑목": {
+  core: "숲이 되려면 다른 나무와 협력해야 합니다",
+  detail: "갑목이 많으면 경쟁이 심합니다",
+  positive: "하지만 함께 크면 더 강해집니다",
+  action: "경쟁보다는 협력을 선택하세요",
+  result: "홀로 크는 나무보다 숲이 강합니다"
+},
+"비겁과다_을목": {
+  core: "덩굴끼리 얽히지 말고 각자의 길을 가세요",
+  detail: "을목이 많으면 서로 휘감아 망가집니다",
+  positive: "하지만 각자의 공간을 존중하면 괜찮습니다",
+  action: "적당한 거리를 유지하세요",
+  result: "각자의 길을 가되 연결되어 있으세요"
+},
+"비겁과다_병화": {
+  core: "불이 불을 만나면 더 크게 타오르거나 서로를 끕니다",
+  detail: "병화가 많으면 경쟁과 충돌이 심합니다",
+  positive: "하지만 에너지는 강력합니다",
+  action: "방향을 맞추면 큰 힘이 됩니다",
+  result: "같은 방향으로 타오르세요"
+},
+"비겁과다_정화": {
+  core: "작은 불들이 모이면 큰 불이 됩니다",
+  detail: "정화가 많으면 섬세함이 충돌합니다",
+  positive: "하지만 협력하면 아름다운 작품을 만듭니다",
+  action: "각자의 역할을 존중하세요",
+  result: "작은 불들의 조화가 예술입니다"
+},
+"비겁과다_무토": {
+  core: "산이 산을 만나면 산맥이 됩니다",
+  detail: "무토가 많으면 고집끼리 부딪힙니다",
+  positive: "하지만 함께 서면 더 단단합니다",
+  action: "자존심을 내려놓고 협력하세요",
+  result: "산맥은 홀로 있는 산보다 강합니다"
+},
+"비겁과다_기토": {
+  core: "흙이 흙을 만나면 땅이 됩니다",
+  detail: "기토가 많으면 무겁고 느립니다",
+  positive: "하지만 안정적입니다",
+  action: "각자의 역할을 분담하세요",
+  result: "함께 모인 땅이 대지입니다"
+},
+"비겁과다_경금": {
+  core: "칼이 칼을 만나면 서로를 벱니다",
+  detail: "경금이 많으면 날카로운 충돌이 잦습니다",
+  positive: "하지만 함께 갈면 더 날카로워집니다",
+  action: "경쟁보다는 서로를 단련시키세요",
+  result: "함께 벼려진 검이 명검입니다"
+},
+"비겁과다_신금": {
+  core: "보석이 보석을 만나면 서로 빛을 가립니다",
+  detail: "신금이 많으면 질투와 경쟁이 생깁니다",
+  positive: "하지만 각자 빛나면 더 아름답습니다",
+  action: "서로의 가치를 인정하세요",
+  result: "보석들의 조화가 왕관입니다"
+},
+"비겁과다_임수": {
+  core: "강물이 강물을 만나면 더 큰 강이 됩니다",
+  detail: "임수가 많으면 방향이 흩어집니다",
+  positive: "하지만 합류하면 바다가 됩니다",
+  action: "같은 방향으로 흐르세요",
+  result: "물은 모이면 바다가 됩니다"
+},
+"비겁과다_계수": {
+  core: "물방울이 물방울을 만나면 더 큰 물이 됩니다",
+  detail: "계수가 많으면 흩어지기 쉽습니다",
+  positive: "하지만 모이면 힘이 됩니다",
+  action: "하나로 모이는 연습을 하세요",
+  result: "작은 물방울도 모이면 강물입니다"
+},
+
+// ========================================
+// 인성강 - 10개
+// ========================================
+"인성강_갑목": {
+  core: "배운 것을 실천하는 나무가 되세요",
+  detail: "갑목은 인성이 강하면 배우기만 하고 안 합니다",
+  positive: "학습 능력은 뛰어납니다",
+  action: "아는 것을 행동으로 옮기세요",
+  result: "실천하는 지식이 진짜 힘입니다"
+},
+"인성강_을목": {
+  core: "실천력을 키우고 행동으로 옮기는 훈련이 필요합니다",
+  detail: "머리는 좋지만 실행력이 약합니다",
+  positive: "학습 능력과 직관력은 당신의 무기입니다",
+  action: "작은 목표를 세우고 매일 실천하세요",
+  result: "아는 것을 행하는 것으로 바꾸면 진정한 힘이 됩니다"
+},
+"인성강_병화": {
+  core: "배운 열정을 행동으로 태우세요",
+  detail: "병화는 인성이 강하면 생각만 많아집니다",
+  positive: "직관력과 통찰력이 뛰어납니다",
+  action: "아이디어를 실행에 옮기세요",
+  result: "행동하는 열정이 진짜입니다"
+},
+"인성강_정화": {
+  core: "섬세한 지식을 작품으로 만드세요",
+  detail: "정화는 인성이 강하면 완벽주의에 빠집니다",
+  positive: "깊은 학습 능력이 있습니다",
+  action: "완벽하지 않아도 일단 시작하세요",
+  result: "만드는 것이 아는 것보다 중요합니다"
+},
+"인성강_무토": {
+  core: "산처럼 쌓인 지식을 나누세요",
+  detail: "무토는 인성이 강하면 혼자 쌓기만 합니다",
+  positive: "풍부한 지식이 있습니다",
+  action: "가르치고 나누는 연습을 하세요",
+  result: "나누는 지식이 더 커집니다"
+},
+"인성강_기토": {
+  core: "배운 것을 심어 열매를 맺으세요",
+  detail: "기토는 인성이 강하면 의존적이 됩니다",
+  positive: "흡수력이 뛰어납니다",
+  action: "스스로 판단하고 실행하세요",
+  result: "독립적인 실천이 성장입니다"
+},
+"인성강_경금": {
+  core: "단련된 지식을 도구로 만드세요",
+  detail: "경금은 인성이 강하면 이론만 강해집니다",
+  positive: "논리적 사고력이 뛰어납니다",
+  action: "이론을 현실에 적용하세요",
+  result: "쓰이는 지식이 가치 있습니다"
+},
+"인성강_신금": {
+  core: "귀한 지식을 빛내세요",
+  detail: "신금은 인성이 강하면 고상하기만 합니다",
+  positive: "깊은 통찰력이 있습니다",
+  action: "현실에 발 디디고 실용성을 키우세요",
+  result: "쓸모있는 보석이 진짜 보석입니다"
+},
+"인성강_임수": {
+  core: "깊은 지식을 흐르게 하세요",
+  detail: "임수는 인성이 강하면 고이기만 합니다",
+  positive: "해박한 지식이 있습니다",
+  action: "지식을 전파하고 나누세요",
+  result: "흐르는 물이 썩지 않습니다"
+},
+"인성강_계수": {
+  core: "섬세한 지식을 스며들게 하세요",
+  detail: "계수는 인성이 강하면 소극적이 됩니다",
+  positive: "직관력이 뛰어납니다",
+  action: "적극적으로 표현하고 실천하세요",
+  result: "작은 실천이 큰 변화를 만듭니다"
+},
+
+// ========================================
+// 식상강 - 10개
+// ========================================
+"식상강_갑목": {
+  core: "열매를 맺는 나무가 되세요",
+  detail: "갑목은 식상이 강하면 표현만 많고 결실이 없습니다",
+  positive: "창의력과 표현력이 뛰어납니다",
+  action: "아이디어를 구체적인 결과물로 만드세요",
+  result: "결실 맺는 나무가 진짜 나무입니다"
+},
+"식상강_을목": {
+  core: "꽃을 피우고 열매도 맺으세요",
+  detail: "을목은 식상이 강하면 화려하기만 합니다",
+  positive: "예술적 감각이 뛰어납니다",
+  action: "표현을 넘어 실질적 성과를 만드세요",
+  result: "아름다움과 실용의 조화입니다"
+},
+"식상강_병화": {
+  core: "말을 아끼고 듣는 연습이 필요합니다",
+  detail: "표현력은 뛰어나지만, 때로 과합니다",
+  positive: "창의력과 재치는 당신의 최고 무기입니다",
+  action: "말하기 전에 한 번 더 생각하세요",
+  result: "적절한 표현은 무기가 되지만, 과하면 독이 됩니다"
+},
+"식상강_정화": {
+  core: "섬세한 표현을 작품으로 승화하세요",
+  detail: "정화는 식상이 강하면 말만 많아집니다",
+  positive: "표현력이 탁월합니다",
+  action: "말보다는 작품으로 보여주세요",
+  result: "작품이 가장 강력한 표현입니다"
+},
+"식상강_무토": {
+  core: "단단한 결과물을 만드세요",
+  detail: "무토는 식상이 강하면 계획만 많습니다",
+  positive: "구상력이 뛰어납니다",
+  action: "계획을 실행으로 옮기세요",
+  result: "실행된 계획이 진짜 성과입니다"
+},
+"식상강_기토": {
+  core: "작은 열매라도 맺으세요",
+  detail: "기토는 식상이 강하면 표현만 많습니다",
+  positive: "섬세한 표현력이 있습니다",
+  action: "작은 것이라도 완성하세요",
+  result: "완성이 완벽보다 중요합니다"
+},
+"식상강_경금": {
+  core: "날카로운 비판을 건설적으로 만드세요",
+  detail: "경금은 식상이 강하면 비판만 합니다",
+  positive: "분석력이 뛰어납니다",
+  action: "대안을 제시하는 비판을 하세요",
+  result: "건설적인 비판이 가치 있습니다"
+},
+"식상강_신금": {
+  core: "고상한 표현을 실용적으로 만드세요",
+  detail: "신금은 식상이 강하면 현학적입니다",
+  positive: "우아한 표현력이 있습니다",
+  action: "쉽고 명확하게 표현하세요",
+  result: "전달되는 표현이 진짜 표현입니다"
+},
+"식상강_임수": {
+  core: "넘치는 표현을 조절하세요",
+  detail: "임수는 식상이 강하면 말이 많습니다",
+  positive: "풍부한 표현력이 있습니다",
+  action: "때로는 침묵도 표현입니다",
+  result: "절제된 표현이 더 강력합니다"
+},
+"식상강_계수": {
+  core: "작은 표현도 의미 있게 만드세요",
+  detail: "계수는 식상이 강하면 산만합니다",
+  positive: "섬세한 표현력이 있습니다",
+  action: "집중해서 하나를 완성하세요",
+  result: "작아도 완성된 것이 가치 있습니다"
+},
+  
+  // ========================================
+  // 3. 신살별 (50개)
+  // ========================================
+  
+  // 원진살 - 5개
+  "원진살_목일간": {
+    core: "본인이 가진 예민함은 '결함'이 아니라 남다른 '레이더'입니다",
+    detail: "남들보다 스트레스를 잘 받는 것은 그만큼 상황 파악이 빠르다는 뜻이니",
+    positive: "이 예민함을 예술이나 기획, 혹은 디테일한 업무 능력으로 승화시켜야 합니다",
+    action: "'존버'는 당신의 타고난 재능이니",
+    result: "당장 성과가 안 보여도 결국 끝까지 살아남아 승자가 될 것입니다"
+  },
+  "원진살_화일간": {
+    core: "감정의 롤러코스터를 즐기는 법을 배우세요",
+    detail: "불처럼 뜨거웠다 차가워지는 감정 기복이 있습니다",
+    positive: "하지만 이 강렬함이 당신의 매력입니다",
+    action: "예민함을 창의력으로 전환하세요",
+    result: "예술가의 영혼을 가졌습니다"
+  },
+  "원진살_토일간": {
+    core: "흔들림 속에서 중심을 잡으세요",
+    detail: "땅도 지진이 나면 흔들립니다",
+    positive: "하지만 결국 다시 안정을 찾습니다",
+    action: "감정의 파도를 견디는 연습을 하세요",
+    result: "시련 후에 더 단단해집니다"
+  },
+  "원진살_금일간": {
+    core: "예리함이 자신을 찌르지 않게 하세요",
+    detail: "칼날이 안으로 향하면 자해가 됩니다",
+    positive: "하지만 통찰력은 탁월합니다",
+    action: "비판을 밖으로 향하지 말고, 건설적으로 사용하세요",
+    result: "날카로움은 도구일 뿐입니다"
+  },
+  "원진살_수일간": {
+    core: "물결치는 감정에 몸을 맡기지 마세요",
+    detail: "물은 흔들리지만 본질은 변하지 않습니다",
+    positive: "깊은 감수성이 당신의 재능입니다",
+    action: "감정을 관찰하되, 휩쓸리지 마세요",
+    result: "고요한 물이 가장 깊습니다"
+  },
+  // 귀문관살 - 5개
+"귀문관살_목일간": {
+  core: "밝은 것에 집중하고 긍정을 연습하세요",
+  detail: "어둠을 보는 눈이 있지만, 빛도 볼 줄 알아야 합니다",
+  positive: "직관력과 통찰력은 남다릅니다",
+  action: "햇볕 쬐기, 운동, 사람 만나기를 의식적으로 하세요",
+  result: "어둠 속에서도 별을 볼 수 있는 것이 당신의 재능입니다"
+},
+"귀문관살_화일간": {
+  core: "어둠을 밝히는 빛이 되세요",
+  detail: "귀문관살은 음침하지만 불은 빛입니다",
+  positive: "어둠을 이해하는 빛이 가장 강합니다",
+  action: "우울을 창작의 원천으로 승화하세요",
+  result: "어둠을 아는 빛이 진짜 빛입니다"
+},
+"귀문관살_토일간": {
+  core: "무거운 땅을 견디는 힘을 키우세요",
+  detail: "귀문관살은 짓누르지만 땅은 견딥니다",
+  positive: "깊은 사색의 힘이 있습니다",
+  action: "우울을 지혜로 바꾸세요",
+  result: "깊이 파고든 땅이 보물을 찾습니다"
+},
+"귀문관살_금일간": {
+  core: "날카로운 통찰을 긍정으로 만드세요",
+  detail: "귀문관살은 비판적이지만 건설적일 수 있습니다",
+  positive: "예리한 관찰력이 있습니다",
+  action: "문제를 보되, 해결책도 보세요",
+  result: "비판과 대안의 균형입니다"
+},
+"귀문관살_수일간": {
+  core: "깊은 바다도 수면은 빛납니다",
+  detail: "귀문관살은 깊지만 빛을 반사할 수 있습니다",
+  positive: "깊은 감수성이 있습니다",
+  action: "깊이를 유지하되, 표면도 빛내세요",
+  result: "깊이와 빛의 조화입니다"
+},
+
+// 충 - 5개
+"충_목일간": {
+  core: "변화를 즐기되, 뿌리는 지키세요",
+  detail: "나무도 흔들리지만 뿌리는 남습니다",
+  positive: "변화 적응력이 뛰어납니다",
+  action: "핵심 가치는 지키며 변화하세요",
+  result: "유연하되 중심은 잃지 마세요"
+},
+"충_화일간": {
+  core: "변화 속에서도 빛을 내세요",
+  detail: "불은 바람에 흔들려도 꺼지지 않습니다",
+  positive: "역동적인 에너지가 있습니다",
+  action: "변화를 기회로 만드세요",
+  result: "흔들림이 더 밝은 빛을 만듭니다"
+},
+"충_토일간": {
+  core: "지진에도 땅은 남습니다",
+  detail: "땅은 흔들려도 본질은 변하지 않습니다",
+  positive: "근본적인 안정성이 있습니다",
+  action: "변화를 받아들이되, 중심은 지키세요",
+  result: "흔들려도 무너지지 않는 힘입니다"
+},
+"충_금일간": {
+  core: "충격에 단련되는 쇠가 되세요",
+  detail: "쇠는 두들겨 맞아야 강해집니다",
+  positive: "시련이 당신을 강하게 만듭니다",
+  action: "변화를 성장의 기회로 보세요",
+  result: "단련된 금속이 가장 강합니다"
+},
+"충_수일간": {
+  core: "변화를 즐기되, 안정의 기반을 만드는 것이 중요합니다",
+  detail: "끊임없는 변화 속에서 지칠 수 있습니다",
+  positive: "변화에 강하고 적응력이 뛰어납니다",
+  action: "불변의 가치 하나를 정하고 그것만은 지키세요",
+  result: "변화무쌍함이 강점이지만, 중심은 잃지 마세요"
+},
+
+// 형 - 5개
+"형_목일간": {
+  core: "자신을 용서하고 관대해지는 연습이 필요합니다",
+  detail: "스스로를 너무 몰아붙이고 자책합니다",
+  positive: "자기 성찰 능력이 뛰어납니다",
+  action: "실수를 배움의 기회로 받아들이세요",
+  result: "자신에게 관대해질 때 진정한 성장이 시작됩니다"
+},
+"형_화일간": {
+  core: "자신을 태우지 마세요",
+  detail: "불은 자신도 태울 수 있습니다",
+  positive: "높은 기준이 있습니다",
+  action: "자기 비판을 적당히 조절하세요",
+  result: "자신을 사랑하는 법을 배우세요"
+},
+"형_토일간": {
+  core: "무너지기 전에 쉬세요",
+  detail: "땅도 침식되면 무너집니다",
+  positive: "책임감이 강합니다",
+  action: "자신을 돌보는 것도 책임입니다",
+  result: "자기 관리가 최고의 책임입니다"
+},
+"형_금일간": {
+  core: "완벽주의를 내려놓으세요",
+  detail: "너무 날카로우면 부러집니다",
+  positive: "높은 기준이 있습니다",
+  action: "70%의 완성도도 괜찮습니다",
+  result: "불완전함을 받아들이는 용기입니다"
+},
+"형_수일간": {
+  core: "자책의 늪에 빠지지 마세요",
+  detail: "물은 깊어지면 빠져나오기 어렵습니다",
+  positive: "성찰 능력이 있습니다",
+  action: "자기 용서를 연습하세요",
+  result: "용서가 치유입니다"
+},
+
+// 해 - 5개
+"해_목일간": {
+  core: "말로 명확하게 표현하고 오해를 풀어가세요",
+  detail: "말 안 해도 알겠지 하는 기대가 문제를 키웁니다",
+  positive: "섬세하고 배려심이 깊습니다",
+  action: "솔직하고 직접적인 소통을 연습하세요",
+  result: "오해는 소통으로만 풀립니다"
+},
+"해_화일간": {
+  core: "감정을 명확히 표현하세요",
+  detail: "불은 뜨겁지만 속마음은 숨깁니다",
+  positive: "열정이 있습니다",
+  action: "진심을 드러내는 용기를 가지세요",
+  result: "솔직함이 관계를 풉니다"
+},
+"해_토일간": {
+  core: "답답함을 표현하세요",
+  detail: "땅은 묵묵하지만 소통이 필요합니다",
+  positive: "인내심이 강합니다",
+  action: "때로는 불편함을 말하세요",
+  result: "표현이 관계를 개선합니다"
+},
+"해_금일간": {
+  core: "서운함을 숨기지 마세요",
+  detail: "쇠는 차갑지만 녹슬 수 있습니다",
+  positive: "냉정함이 있습니다",
+  action: "감정도 표현하세요",
+  result: "감정 표현이 관계를 따뜻하게 합니다"
+},
+"해_수일간": {
+  core: "깊은 속마음을 나누세요",
+  detail: "물은 깊지만 소통이 필요합니다",
+  positive: "깊은 감정이 있습니다",
+  action: "표면적인 대화를 넘어서세요",
+  result: "진짜 소통이 관계를 깊게 합니다"
+},
+
+// 도화살 - 5개
+"도화살_목일간": {
+  core: "매력을 긍정적으로 사용하세요",
+  detail: "나무꽃은 아름답지만 열매도 중요합니다",
+  positive: "사람을 끌어당기는 힘이 있습니다",
+  action: "외모보다 내면을 키우세요",
+  result: "진짜 매력은 내면에서 나옵니다"
+},
+"도화살_화일간": {
+  core: "충동을 억제하고 신중하게 판단하는 습관이 필요합니다",
+  detail: "매력적이지만, 유혹에 약한 것이 단점입니다",
+  positive: "사람을 끌어당기는 힘은 큰 자산입니다",
+  action: "이성 관계에서 한 템포 쉬고 생각하세요",
+  result: "충동을 제어하면 진정한 인연을 만날 수 있습니다"
+},
+"도화살_토일간": {
+  core: "안정적인 매력을 키우세요",
+  detail: "땅의 도화살은 든든한 매력입니다",
+  positive: "신뢰를 주는 매력이 있습니다",
+  action: "화려함보다 진실함을 선택하세요",
+  result: "진심이 가장 큰 매력입니다"
+},
+"도화살_금일간": {
+  core: "차가운 매력을 따뜻하게 만드세요",
+  detail: "금의 도화살은 고고합니다",
+  positive: "고귀한 매력이 있습니다",
+  action: "접근 가능하게 만드세요",
+  result: "따뜻한 고귀함이 진짜 매력입니다"
+},
+"도화살_수일간": {
+  core: "흐르는 매력을 깊게 만드세요",
+  detail: "물의 도화살은 변덕스럽습니다",
+  positive: "신비로운 매력이 있습니다",
+  action: "진정성을 더하세요",
+  result: "깊이 있는 매력이 오래 갑니다"
+},
+
+// 홍염살 - 5개
+"홍염살_목일간": {
+  core: "뜨거운 매력을 조절하세요",
+  detail: "나무가 불타면 재만 남습니다",
+  positive: "강렬한 카리스마가 있습니다",
+  action: "적당한 거리를 유지하세요",
+  result: "타지 않는 열정이 오래 갑니다"
+},
+"홍염살_화일간": {
+  core: "불에 불을 더하지 마세요",
+  detail: "너무 뜨거우면 상대가 도망갑니다",
+  positive: "폭발적인 매력이 있습니다",
+  action: "온도를 조절하는 법을 배우세요",
+  result: "적당한 뜨거움이 최고입니다"
+},
+"홍염살_토일간": {
+  core: "뜨거운 땅의 매력을 키우세요",
+  detail: "용암처럼 뜨거운 매력입니다",
+  positive: "강렬한 존재감이 있습니다",
+  action: "폭발하지 말고 타오르세요",
+  result: "지속 가능한 열정이 진짜입니다"
+},
+"홍염살_금일간": {
+  core: "차가운 금속도 홍염을 만나면 녹습니다",
+  detail: "냉정함과 열정의 조합입니다",
+  positive: "독특한 매력이 있습니다",
+  action: "균형을 찾으세요",
+  result: "냉과 열의 조화가 매력입니다"
+},
+"홍염살_수일간": {
+  core: "끓는 물의 매력을 조절하세요",
+  detail: "물도 끓으면 수증기가 됩니다",
+  positive: "열정적인 매력이 있습니다",
+  action: "식혀가며 관계를 유지하세요",
+  result: "적온이 관계를 오래 유지합니다"
+},
+
+// 역마살 - 5개
+"역마살_목일간": {
+  core: "뿌리를 내리되 가지는 뻗으세요",
+  detail: "나무도 움직일 수 있습니다",
+  positive: "성장 욕구가 강합니다",
+  action: "이동하되 기반은 지키세요",
+  result: "뿌리 깊은 나무가 멀리 뻗습니다"
+},
+"역마살_화일간": {
+  core: "움직이는 불빛이 되세요",
+  detail: "불은 타고 이동합니다",
+  positive: "역동적인 에너지가 있습니다",
+  action: "움직이되 방향은 잃지 마세요",
+  result: "목표를 향해 움직이세요"
+},
+"역마살_토일간": {
+  core: "움직임 속에서도 중심을 잡는 연습이 필요합니다",
+  detail: "끊임없이 움직이지만, 때로는 머무는 용기도 필요합니다",
+  positive: "변화와 도전을 즐기는 것은 큰 강점입니다",
+  action: "한곳에 뿌리내리되, 자유를 느낄 수 있는 환경을 만드세요",
+  result: "흐르되 고이지 않는 물처럼, 움직이되 중심을 잃지 마세요"
+},
+"역마살_금일간": {
+  core: "날카로움을 가지고 이동하세요",
+  detail: "칼도 필요에 따라 옮겨집니다",
+  positive: "기동력이 뛰어납니다",
+  action: "움직이되 목적을 잃지 마세요",
+  result: "목적 있는 이동이 성공입니다"
+},
+"역마살_수일간": {
+  core: "흐르되 방향을 잃지 마세요",
+  detail: "물은 흘러야 살아있습니다",
+  positive: "자유로운 영혼입니다",
+  action: "움직이되 목표는 있어야 합니다",
+  result: "흐르는 물이 바다에 닿습니다"
+},
+
+// 화개살 - 5개
+"화개살_목일간": {
+  core: "혼자만의 시간을 즐기되, 고립되지는 마세요",
+  detail: "고독을 사랑하지만, 외로움은 다릅니다",
+  positive: "예술적 감각과 창의력이 뛰어납니다",
+  action: "소수의 깊은 관계를 유지하세요",
+  result: "혼자이되 외롭지 않은 삶이 당신에게 맞습니다"
+},
+"화개살_화일간": {
+  core: "홀로 빛나는 법을 배우세요",
+  detail: "불은 혼자 타오를 수 있습니다",
+  positive: "독창성이 뛰어납니다",
+  action: "고독을 창작의 원천으로 삼으세요",
+  result: "홀로 빛나는 별이 가장 밝습니다"
+},
+"화개살_토일간": {
+  core: "고독한 산이 되세요",
+  detail: "산은 홀로 우뚝 섭니다",
+  positive: "독립적인 사고가 있습니다",
+  action: "고독을 철학으로 승화하세요",
+  result: "홀로 서는 산이 가장 높습니다"
+},
+"화개살_금일간": {
+  core: "고독 속에서 빛나세요",
+  detail: "보석은 홀로 있어도 빛납니다",
+  positive: "자기만의 세계가 있습니다",
+  action: "고독을 예술로 만드세요",
+  result: "홀로 빛나는 보석이 진짜입니다"
+},
+"화개살_수일간": {
+  core: "깊은 바다의 고독을 즐기세요",
+  detail: "물은 깊을수록 고요합니다",
+  positive: "깊은 사색의 힘이 있습니다",
+  action: "고독을 지혜로 바꾸세요",
+  result: "깊은 고독이 깊은 지혜를 만듭니다"
+},
+
+// 공망 - 5개
+"공망_목일간": {
+  core: "작은 것에서 의미를 찾고 현실에 발 디디세요",
+  detail: "큰 그림만 보다 현실을 놓칠 수 있습니다",
+  positive: "정신적 깊이와 철학적 사고가 뛰어납니다",
+  action: "명상이나 봉사활동으로 마음의 평화를 찾으세요",
+  result: "비움 속에서 채움을 발견하는 것이 당신의 길입니다"
+},
+"공망_화일간": {
+  core: "빛 속의 어둠을 인정하세요",
+  detail: "불도 타고 나면 허무합니다",
+  positive: "깊은 통찰력이 있습니다",
+  action: "허무를 창작의 원천으로 삼으세요",
+  result: "공허가 충만을 만듭니다"
+},
+"공망_토일간": {
+  core: "땅도 비워야 채울 수 있습니다",
+  detail: "공망은 비움입니다",
+  positive: "수용력이 있습니다",
+  action: "비우고 채우는 연습을 하세요",
+  result: "비움이 채움의 시작입니다"
+},
+"공망_금일간": {
+  core: "완벽함 속의 허무를 채우세요",
+  detail: "금도 완벽해도 공허할 수 있습니다",
+  positive: "깊은 성찰력이 있습니다",
+  action: "물질을 넘어 의미를 찾으세요",
+  result: "진짜 가치는 비움에 있습니다"
+},
+"공망_수일간": {
+  core: "깊은 바다의 허무를 채우세요",
+  detail: "물은 깊을수록 공허합니다",
+  positive: "철학적 사고가 있습니다",
+  action: "허무를 지혜로 전환하세요",
+  result: "공허를 아는 자가 충만을 압니다"
+},
+  
+  // ========================================
+  // 4. 복합 패턴 (30개)
+  // ========================================
+  
+  "수과다_무관_목일간": {
+    core: "물은 많은데 방향이 없으니 표류하기 쉽습니다",
+    detail: "나무는 물을 머금고 자라지만, 관성이 없어 어디로 자랄지 모릅니다",
+    positive: "하지만 어디든 갈 수 있는 자유가 있습니다",
+    action: "스스로 목표를 세우고, 그것을 나침반으로 삼으세요",
+    result: "자유로운 영혼도 목표가 필요합니다"
+  },
+  
+  "재다신약_원진살": {
+    core: "예민한 감각으로 재물을 다루되, 압도되지 마세요",
+    detail: "기회는 많지만 감당하기 벅차고, 예민해서 더 힘듭니다",
+    positive: "하지만 섬세하게 관리할 수 있는 능력이 있습니다",
+    action: "하나씩 차근차근 정리하며, 감정 관리도 병행하세요",
+    result: "예민함이 자산 관리 능력이 됩니다"
+  },
+  
+  "비겁강_재약": {
+    core: "남에게 기대지 말고 본인의 힘으로 길을 개척하세요",
+    detail: "경쟁심이 강하고 자존심이 세지만, 그것이 바로 당신의 무기입니다",
+    positive: "협업보다는 독립적으로 일할 때 더 빛납니다",
+    action: "창업이나 프리랜서를 고려해보세요",
+    result: "본인만의 왕국을 건설할 수 있습니다"
+  },
+  
+  "관왕신약_스트레스": {
+    core: "완벽을 내려놓고 여유를 찾는 연습이 필요합니다",
+    detail: "책임감이 강하지만, 스스로를 너무 몰아붙입니다",
+    positive: "리더십과 책임감은 당신의 큰 자산입니다",
+    action: "적당히 쉬고, 남에게 도움을 청하는 것도 능력입니다",
+    result: "숨 쉴 공간을 만들면 더 오래 달릴 수 있습니다"
+  }
+  
+"수과다_무관_화일간": {
+  core: "물과 불의 대립, 그리고 방향의 부재를 해결하세요",
+  detail: "불은 물에 꺼지려 하고, 관성도 없어 방향을 잃습니다",
+  positive: "하지만 자유로운 창의력이 있습니다",
+  action: "스스로 목표를 세우고, 감정을 조절하세요",
+  result: "균형과 방향이 당신을 완성합니다"
+},
+
+"수과다_무관_토일간": {
+  core: "물은 많은데 나무가 없으니 흙이 떠내려갑니다",
+  detail: "관성이 없어 중심을 잡기 어렵습니다",
+  positive: "하지만 자유롭고 유연합니다",
+  action: "스스로 기준을 세우고, 댐을 쌓으세요",
+  result: "자기 관리가 성공의 열쇠입니다"
+},
+
+"수과다_무관_금일간": {
+  core: "물이 많아 녹슬 수 있고, 관성도 없어 방향이 없습니다",
+  detail: "자유롭지만 불안정합니다",
+  positive: "하지만 유연하고 창의적입니다",
+  action: "자기 관리와 목표 설정이 필수입니다",
+  result: "원칙을 스스로 만드세요"
+},
+
+"수과다_무관_수일간": {
+  core: "물이 물을 만나 바다가 되었는데 방향이 없습니다",
+  detail: "자유롭지만 표류할 수 있습니다",
+  positive: "무한한 가능성이 있습니다",
+  action: "목표를 명확히 하고, 그것을 향해 흐르세요",
+  result: "방향 있는 흐름이 바다에 닿습니다"
+},
+
+"재다신약_귀문관살": {
+  core: "재물은 많은데 감당하기 벅차고, 우울까지 겹칩니다",
+  detail: "기회와 압박이 동시에 옵니다",
+  positive: "하지만 깊은 통찰력이 있습니다",
+  action: "심리 관리와 자기계발을 병행하세요",
+  result: "마음을 다스리면 재물도 다스릴 수 있습니다"
+},
+
+"재다신약_충": {
+  core: "재물은 많은데 변동성도 크고 감당하기 어렵습니다",
+  detail: "기회와 위기가 공존합니다",
+  positive: "하지만 역동적인 에너지가 있습니다",
+  action: "안정적인 기반을 만들고, 변화에 대응하세요",
+  result: "중심을 지키며 변화를 활용하세요"
+},
+
+"비겁강_재약_무관": {
+  core: "능력은 있는데 기회도 없고 방향도 없습니다",
+  detail: "자존심만 강하고 현실은 어렵습니다",
+  positive: "하지만 독립적인 힘이 있습니다",
+  action: "적극적으로 기회를 만들고, 목표를 설정하세요",
+  result: "스스로 길을 만드는 자가 성공합니다"
+},
+
+"관왕신약_인성강": {
+  core: "책임은 크고 배우기만 하고 실천은 약합니다",
+  detail: "압박감이 크고 행동력이 부족합니다",
+  positive: "하지만 학습 능력은 뛰어납니다",
+  action: "배운 것을 실천하고, 책임을 나누세요",
+  result: "실천하는 지식이 진짜 힘입니다"
+},
+
+"식상강_재약": {
+  core: "표현은 많은데 돈은 없습니다",
+  detail: "말만 많고 실속이 없습니다",
+  positive: "하지만 창의력은 뛰어납니다",
+  action: "표현을 수익으로 전환하세요",
+  result: "창작을 사업으로 만드세요"
+},
+
+"인성강_비겁강": {
+  core: "배우기만 하고 경쟁만 합니다",
+  detail: "실천 없이 자존심만 강합니다",
+  positive: "하지만 능력은 충분합니다",
+  action: "협력하고 실천하세요",
+  result: "함께 실천하는 것이 성공입니다"
+},
+
+"도화살_역마살": {
+  core: "매력적이고 자유롭지만 정착하지 못합니다",
+  detail: "사람을 끌지만 관계가 오래 가지 않습니다",
+  positive: "하지만 카리스마가 있습니다",
+  action: "진정성과 안정성을 키우세요",
+  result: "매력과 진심의 조화입니다"
+},
+
+"원진살_귀문관살": {
+  core: "예민하고 우울한 조합입니다",
+  detail: "감정 기복이 크고 어둠을 봅니다",
+  positive: "하지만 깊은 통찰력이 있습니다",
+  action: "심리 관리와 긍정 훈련을 하세요",
+  result: "어둠을 이해하는 자가 빛을 만듭니다"
+},
+
+"충_형": {
+  core: "변동성과 자책이 겹칩니다",
+  detail: "불안정하고 스스로를 몰아붙입니다",
+  positive: "하지만 성찰력이 있습니다",
+  action: "안정을 찾고, 자신을 용서하세요",
+  result: "안정과 용서가 치유입니다"
+},
+
+"화개살_공망": {
+  core: "고독과 허무가 만났습니다",
+  detail: "세상과 단절되고 공허합니다",
+  positive: "하지만 철학적 깊이가 있습니다",
+  action: "의미를 찾고, 사람들과 연결되세요",
+  result: "고독과 연결의 균형입니다"
+},
+
+"수과다_화과다": {
+  core: "물과 불이 충돌합니다",
+  detail: "감정과 열정이 극단적입니다",
+  positive: "하지만 폭발적인 에너지가 있습니다",
+  action: "균형을 찾고, 조화를 이루세요",
+  result: "물과 불의 조화가 수증기입니다"
+},
+
+"토과다_금과다": {
+  core: "무겁고 날카롭습니다",
+  detail: "느리고 비판적입니다",
+  positive: "하지만 단단하고 정확합니다",
+  action: "유연함과 따뜻함을 더하세요",
+  result: "단단함과 부드러움의 조화입니다"
+},
+
+"목부족_금과다": {
+  core: "나무는 없고 칼만 많습니다",
+  detail: "베어낼 것이 없어 공허합니다",
+  positive: "하지만 예리함은 있습니다",
+  action: "목표를 세우고 그것을 향해 나아가세요",
+  result: "목표가 칼날에 의미를 줍니다"
+},
+
+"재다신약_식상강": {
+  core: "재물은 많고 표현도 많은데 감당이 안 됩니다",
+  detail: "기회와 아이디어는 넘치는데 체력이 부족합니다",
+  positive: "하지만 창의력과 가능성은 무한합니다",
+  action: "선택과 집중, 그리고 체력 관리를 하세요",
+  result: "관리가 성공을 만듭니다"
+},
+
+"관왕신약_비겁강": {
+  core: "책임은 크고 자존심도 세지만 힘이 부족합니다",
+  detail: "압박과 경쟁에 지칩니다",
+  positive: "하지만 리더십은 있습니다",
+  action: "협력하고 위임하세요",
+  result: "함께 하는 리더십입니다"
+},
+
+"인성강_식상강": {
+  core: "배우기만 하고 표현만 많습니다",
+  detail: "이론과 말만 많고 실천이 없습니다",
+  positive: "하지만 지식과 창의력은 뛰어납니다",
+  action: "배운 것을 실천하고, 표현을 결과로 만드세요",
+  result: "실천과 완성이 진짜 능력입니다"
+},
+
+"비겁강_식상강": {
+  core: "자존심 세게 표현만 많이 합니다",
+  detail: "경쟁적으로 말만 많고 결실이 없습니다",
+  positive: "하지만 에너지와 창의력은 충만합니다",
+  action: "협력하고 완성하세요",
+  result: "함께 만드는 결과가 진짜입니다"
+},
+
+"원진살_도화살": {
+  core: "예민하고 매력적이지만 불안정합니다",
+  detail: "감정 기복이 크고 관계도 변덕스럽습니다",
+  positive: "하지만 강렬한 카리스마가 있습니다",
+  action: "안정성을 키우고, 진심을 보이세요",
+  result: "예민한 매력이 진짜 매력입니다"
+},
+
+"귀문관살_화개살": {
+  core: "우울하고 고독합니다",
+  detail: "어둠 속의 고독입니다",
+  positive: "하지만 깊은 예술성이 있습니다",
+  action: "창작으로 승화하고, 연결을 시도하세요",
+  result: "고독과 우울이 예술이 됩니다"
+},
+
+"충_역마살": {
+  core: "변동과 이동이 겹칩니다",
+  detail: "끊임없이 움직이고 변화합니다",
+  positive: "하지만 역동성은 강합니다",
+  action: "중심을 잡고, 방향을 정하세요",
+  result: "방향 있는 움직임이 성공입니다"
+},
+
+"형_해": {
+  core: "자책과 오해가 겹칩니다",
+  detail: "스스로를 몰아붙이고 관계도 어렵습니다",
+  positive: "하지만 성찰력은 깊습니다",
+  action: "자신을 용서하고, 솔직하게 소통하세요",
+  result: "용서와 소통이 치유입니다"
+},
+
+"홍염살_역마살": {
+  core: "뜨겁게 타오르며 이동합니다",
+  detail: "관계가 급격하게 시작되고 끝납니다",
+  positive: "하지만 열정과 자유가 있습니다",
+  action: "안정성을 더하고, 지속성을 키우세요",
+  result: "열정과 안정의 균형입니다"
+},
+
+"공망_화개살": {
+  core: "허무와 고독이 만났습니다",
+  detail: "공허하고 외롭습니다",
+  positive: "하지만 철학적 깊이가 있습니다",
+  action: "의미를 창조하고, 작은 연결을 시도하세요",
+  result: "공허에서 충만을 만드세요"
+}
+};
+
+📦 10. ILGAN_ELEMENT_STRENGTH (50개)
+const ILGAN_ELEMENT_STRENGTH = {
+  "기토_수과다": {
+    keyword: "유연함과 재물운",
+    detail: "물을 머금은 흙은 생명을 키우는 옥토가 됩니다"
+  },
+  "무토_수과다": {
+    keyword: "포용력과 스케일",
+    detail: "큰 물을 막아서는 댐처럼 거대한 그릇을 가졌습니다"
+  },
+  "을목_토강": {
+    keyword: "끈질긴 생명력",
+    detail: "바위틈에서도 뿌리내리는 강인함"
+  },
+  "갑목_토강": {
+    keyword: "안정된 성장",
+    detail: "비옥한 땅에 뿌리내린 나무처럼 든든합니다"
+  },
+  "병화_목강": {
+    keyword: "폭발적 창의력",
+    detail: "장작을 만난 불처럼 활활 타오르는 열정"
+  },
+  "정화_목강": {
+    keyword: "지속적인 에너지",
+    detail: "나무를 태워 오래 타오르는 지속력"
+  },
+  "경금_화강": {
+    keyword: "단련된 명검",
+    detail: "불에 달궈져 더욱 날카로워진 칼날"
+  },
+  "신금_화강": {
+    keyword: "정제된 완성도",
+    detail: "불로 제련되어 순수해진 보석"
+  },
+  "임수_금강": {
+    keyword: "맑고 깨끗한 지혜",
+    detail: "금에서 나온 물은 생수처럼 맑습니다"
+  },
+  "계수_금강": {
+    keyword: "은밀한 영향력",
+    detail: "이슬처럼 조용히 스며드는 힘"
+  },
+  "기토_목부족": {
+    keyword: "자유로운 영혼",
+    detail: "나무 없는 땅은 틀에 얽매이지 않습니다"
+  },
+  "무토_목부족": {
+    keyword: "광활한 가능성",
+    detail: "제약 없는 평원처럼 무한한 확장성"
+  },
+  "갑목_수강": {
+    keyword: "물 만난 나무",
+    detail: "충분한 물로 쑥쑥 자라는 생명력"
+  },
+  "을목_수강": {
+    keyword: "유연한 적응력",
+    detail: "물을 따라 자라는 덩굴의 지혜"
+  },
+  "병화_금강": {
+    keyword: "강력한 제련력",
+    detail: "쇠를 녹이는 뜨거운 불길"
+  },
+  "정화_금강": {
+    keyword: "섬세한 세공",
+    detail: "보석을 다듬는 정밀한 불꽃"
+  },
+  "경금_토강": {
+    keyword: "안정된 가치",
+    detail: "땅속에 묻힌 금맥처럼 단단한 기반"
+  },
+  "신금_토강": {
+    keyword: "숨겨진 보석",
+    detail: "흙 속 보석처럼 발견되길 기다리는 가치"
+  },
+  "임수_목강": {
+    keyword: "생명을 키우는 물",
+    detail: "나무를 키우는 강물의 자비"
+  },
+  "계수_목강": {
+    keyword: "은은한 양분",
+    detail: "이슬로 나무를 적시는 섬세함"
+  },
+  "기토_화강": {
+    keyword: "뜨거운 열정",
+    detail: "불에 달궈진 흙은 도자기가 됩니다"
+  },
+  "무토_화강": {
+    keyword: "강렬한 카리스마",
+    detail: "용암처럼 끓어오르는 폭발력"
+  },
+  "갑목_화강": {
+    keyword: "활활 타는 리더십",
+    detail: "장작이 불을 만나 빛을 발합니다"
+  },
+  "을목_화강": {
+    keyword: "타오르는 근성",
+    detail: "불 속에서도 꺾이지 않는 의지"
+  },
+  "병화_수강": {
+    keyword: "균형 잡힌 열정",
+    detail: "물이 불을 조절해 적당한 온기를 만듭니다"
+  },
+  "정화_수강": {
+    keyword: "은은한 따뜻함",
+    detail: "물 위를 떠다니는 촛불처럼 부드럽습니다"
+  },
+  "경금_수부족": {
+    keyword: "녹슬지 않는 강철",
+    detail: "물 없이도 변하지 않는 강인함"
+  },
+  "신금_수부족": {
+    keyword: "건조한 완벽주의",
+    detail: "물기 없는 보석처럼 딱딱하지만 완벽합니다"
+  },
+  "임수_화부족": {
+    keyword: "차가운 냉철함",
+    detail: "불 없는 물은 얼음처럼 냉정합니다"
+  },
+  "계수_화부족": {
+    keyword: "냉랭한 현실주의",
+    detail: "따뜻함 없는 이슬은 차갑습니다"
+  },
+  "기토_금강": {
+    keyword: "숨겨진 보물",
+    detail: "금을 품은 흙은 광산입니다"
+  },
+  "무토_금강": {
+    keyword: "단단한 기반",
+    detail: "바위산처럼 흔들림 없는 안정성"
+  },
+  "갑목_금강": {
+    keyword: "도전과 극복",
+    detail: "도끼를 맞아도 다시 자라는 생명력"
+  },
+  "을목_금강": {
+    keyword: "유연한 회피",
+    detail: "칼날을 피해 휘어지는 지혜"
+  },
+  "병화_토강": {
+    keyword: "안정된 열정",
+    detail: "흙이 불을 감싸 오래 타오르게 합니다"
+  },
+  "정화_토강": {
+    keyword: "은은한 지속",
+    detail: "흙 속 불씨처럼 꺼지지 않는 끈기"
+  },
+  "경금_목부족": {
+    keyword: "날카로운 자유",
+    detail: "베어낼 나무 없이 날만 세웁니다"
+  },
+  "신금_목부족": {
+    keyword: "쓸모없는 완벽",
+    detail: "다듬을 나무 없이 기술만 뛰어납니다"
+  },
+  "임수_토부족": {
+    keyword: "방향 없는 흐름",
+    detail: "제방 없는 물은 범람합니다"
+  },
+  "계수_토부족": {
+    keyword: "흩어지는 에너지",
+    detail: "흙 없이 스며들 곳이 없습니다"
+  },
+  "기토_토과다": {
+    keyword: "느리지만 견고",
+    detail: "산처럼 쌓여 무겁지만 단단합니다"
+  },
+  "무토_토과다": {
+    keyword: "거대한 안정감",
+    detail: "산맥처럼 움직이지 않는 중심축"
+  },
+  "갑목_목과다": {
+    keyword: "경쟁과 성장",
+    detail: "숲 속에서 하늘을 향해 자랍니다"
+  },
+  "을목_목과다": {
+    keyword: "얽히고설킨 복잡함",
+    detail: "정글처럼 복잡하지만 생명력 넘칩니다"
+  },
+  "병화_화과다": {
+    keyword: "과열된 열정",
+    detail: "타오르다 탈진할 위험이 있습니다"
+  },
+  "정화_화과다": {
+    keyword: "지나친 섬세함",
+    detail: "너무 예민해 에너지 소모가 큽니다"
+  },
+  "경금_금과다": {
+    keyword: "냉혹한 완벽주의",
+    detail: "칼날만 있어 차갑고 날카롭습니다"
+  },
+  "신금_금과다": {
+    keyword: "지나친 고집",
+    detail: "너무 단단해 부러질 수 있습니다"
+  },
+  "임수_수과다": {
+    keyword: "범람하는 감정",
+    detail: "홍수처럼 감당하기 어려운 에너지"
+  },
+  "계수_수과다": {
+    keyword: "우울과 몽환",
+    detail: "깊은 바다처럼 빠져들기 쉽습니다"
+  }
+};
